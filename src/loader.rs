@@ -5,6 +5,7 @@ use crate::{
 
 #[cfg(feature = "bevy_animation")]
 use bevy_animation::{AnimationTarget, AnimationTargetId};
+use bevy_asset::AsyncReadExt;
 use bevy_asset::{
     io::Reader, AssetLoadError, AssetLoader, Handle, LoadContext, ReadAssetBytesError,
 };
@@ -13,7 +14,7 @@ use bevy_core::Name;
 use bevy_core_pipeline::prelude::Camera3dBundle;
 use bevy_ecs::entity::EntityHashMap;
 use bevy_ecs::{entity::Entity, world::World};
-use bevy_hierarchy::{BuildChildren, ChildBuild, WorldChildBuilder};
+use bevy_hierarchy::{BuildWorldChildren, WorldChildBuilder};
 use bevy_math::{Affine2, Mat4, Vec3};
 use bevy_pbr::{
     DirectionalLight, DirectionalLightBundle, PbrBundle, PointLight, PointLightBundle, SpotLight,
@@ -41,7 +42,7 @@ use bevy_scene::Scene;
 use bevy_tasks::IoTaskPool;
 use bevy_transform::components::Transform;
 use bevy_utils::tracing::{error, info_span, warn};
-use bevy_utils::{HashMap, HashSet};
+use bevy_utils::{ConditionalSendFuture, HashMap, HashSet};
 use gltf::image::Source;
 use gltf::{
     accessor::Iter,
@@ -54,6 +55,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{value, Value};
 #[cfg(feature = "bevy_animation")]
 use smallvec::SmallVec;
+use std::future::Future;
 use std::io::Error;
 use std::{
     collections::VecDeque,
@@ -174,15 +176,17 @@ impl AssetLoader for GltfLoader {
     type Asset = Gltf;
     type Settings = GltfLoaderSettings;
     type Error = GltfError;
-    async fn load<'a>(
+    fn load<'a>(
         &'a self,
-        reader: &'a mut dyn Reader,
+        reader: &'a mut Reader,
         settings: &'a GltfLoaderSettings,
-        load_context: &'a mut LoadContext<'_>,
-    ) -> Result<Gltf, Self::Error> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes).await?;
-        load_gltf(self, &bytes, load_context, settings).await
+        load_context: &'a mut LoadContext,
+    ) -> impl ConditionalSendFuture + Future<Output = Result<<Self as AssetLoader>::Asset, <Self as AssetLoader>::Error>> {
+        Box::pin(async move {
+            let mut bytes = Vec::new();
+            reader.read_to_end(&mut bytes).await?;
+            load_gltf(self, &bytes, load_context, settings).await
+        })
     }
 
     fn extensions(&self) -> &[&str] {
