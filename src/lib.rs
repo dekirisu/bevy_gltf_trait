@@ -95,8 +95,6 @@
 //!
 //! You can use [`GltfAssetLabel`] to ensure you are using the correct label.
 
-use std::marker::PhantomData;
-
 #[cfg(feature = "bevy_animation")]
 use bevy_animation::AnimationClip;
 use bevy_utils::HashMap;
@@ -116,6 +114,7 @@ use bevy_render::{
     texture::CompressedImageFormats,
 };
 use bevy_scene::Scene;
+use std::marker::PhantomData;
 
 /// The `bevy_gltf` prelude.
 pub mod prelude {
@@ -123,7 +122,10 @@ pub mod prelude {
     pub use crate::{Gltf, GltfAssetLabel, GltfExtras};
 }
 
-pub trait GltfTrait: Send+Sync+'static {}
+pub trait GltfTrait: Send+Sync+'static {
+    /// The extensions used by the asset loader
+    const EXTENSIONS: &'static [&'static str] = &["gltf", "glb"];
+}
 pub struct GltfTraitDefault;
 impl GltfTrait for () {}
 
@@ -160,7 +162,7 @@ impl <G:GltfTrait> Plugin for GltfPlugin <G> {
             .init_asset::<GltfNode>()
             .init_asset::<GltfPrimitive>()
             .init_asset::<GltfMesh>()
-            .preregister_asset_loader::<GltfLoader>(&["gltf", "glb"]);
+            .preregister_asset_loader::<GltfLoader<G>>(G::EXTENSIONS);
     }
 
     fn finish(&self, app: &mut App) {
@@ -168,9 +170,10 @@ impl <G:GltfTrait> Plugin for GltfPlugin <G> {
             Some(render_device) => CompressedImageFormats::from_features(render_device.features()),
             None => CompressedImageFormats::NONE,
         };
-        app.register_asset_loader(GltfLoader {
+        app.register_asset_loader(GltfLoader::<G> {
             supported_compressed_formats,
             custom_vertex_attributes: self.custom_vertex_attributes.clone(),
+            phantom: PhantomData::default()
         });
     }
 }

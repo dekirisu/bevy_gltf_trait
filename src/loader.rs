@@ -1,3 +1,4 @@
+use crate::GltfTrait;
 use crate::{
     vertex_attributes::convert_attribute, Gltf, GltfAssetLabel, GltfExtras, GltfMaterialExtras,
     GltfMeshExtras, GltfNode, GltfSceneExtras,
@@ -62,6 +63,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use thiserror::Error;
+use std::marker::PhantomData;
 
 /// An error that occurs when loading a glTF file.
 #[derive(Error, Debug)]
@@ -114,7 +116,7 @@ pub enum GltfError {
 }
 
 /// Loads glTF files with all of their data as their corresponding bevy representations.
-pub struct GltfLoader {
+pub struct GltfLoader  <G:GltfTrait> {
     /// List of compressed image formats handled by the loader.
     pub supported_compressed_formats: CompressedImageFormats,
     /// Custom vertex attributes that will be recognized when loading a glTF file.
@@ -123,6 +125,7 @@ pub struct GltfLoader {
     /// See [this section of the glTF specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#meshes-overview)
     /// for additional details on custom attributes.
     pub custom_vertex_attributes: HashMap<Box<str>, MeshVertexAttribute>,
+    pub phantom: PhantomData<G>
 }
 
 /// Specifies optional settings for processing gltfs at load time. By default, all recognized contents of
@@ -172,7 +175,7 @@ impl Default for GltfLoaderSettings {
     }
 }
 
-impl AssetLoader for GltfLoader {
+impl <G:GltfTrait> AssetLoader for GltfLoader <G> {
     type Asset = Gltf;
     type Settings = GltfLoaderSettings;
     type Error = GltfError;
@@ -189,14 +192,12 @@ impl AssetLoader for GltfLoader {
         })
     }
 
-    fn extensions(&self) -> &[&str] {
-        &["gltf", "glb"]
-    }
+    fn extensions(&self) -> &[&str] {G::EXTENSIONS}
 }
 
 /// Loads an entire glTF file.
-async fn load_gltf<'a, 'b, 'c>(
-    loader: &GltfLoader,
+async fn load_gltf<'a, 'b, 'c, G:GltfTrait>(
+    loader: &GltfLoader<G>,
     bytes: &'a [u8],
     load_context: &'b mut LoadContext<'c>,
     settings: &'b GltfLoaderSettings,
