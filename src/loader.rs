@@ -1,4 +1,4 @@
-use crate::{GltfEditLight, GltfTrait};
+use crate::{GltfEditLight, GltfEdit};
 use crate::{
     vertex_attributes::convert_attribute, Gltf, GltfAssetLabel, GltfExtras, GltfMaterialExtras,
     GltfMeshExtras, GltfNode, GltfSceneExtras,
@@ -116,7 +116,7 @@ pub enum GltfError {
 }
 
 /// Loads glTF files with all of their data as their corresponding bevy representations.
-pub struct GltfLoader  <G:GltfTrait> {
+pub struct GltfLoader  <G:GltfEdit> {
     /// List of compressed image formats handled by the loader.
     pub supported_compressed_formats: CompressedImageFormats,
     /// Custom vertex attributes that will be recognized when loading a glTF file.
@@ -175,7 +175,7 @@ impl Default for GltfLoaderSettings {
     }
 }
 
-impl <G:GltfTrait> AssetLoader for GltfLoader <G> {
+impl <G:GltfEdit> AssetLoader for GltfLoader <G> {
     type Asset = Gltf;
     type Settings = GltfLoaderSettings;
     type Error = GltfError;
@@ -196,7 +196,7 @@ impl <G:GltfTrait> AssetLoader for GltfLoader <G> {
 }
 
 /// Loads an entire glTF file.
-async fn load_gltf<'a, 'b, 'c, G:GltfTrait>(
+async fn load_gltf<'a, 'b, 'c, G:GltfEdit>(
     loader: &GltfLoader<G>,
     bytes: &'a [u8],
     load_context: &'b mut LoadContext<'c>,
@@ -1177,7 +1177,7 @@ fn warn_on_differing_texture_transforms(
 
 /// Loads a glTF node.
 #[allow(clippy::too_many_arguments, clippy::result_large_err)]
-fn load_node <G:GltfTrait> (
+fn load_node <G:GltfEdit> (
     gltf_node: &Node,
     world_builder: &mut WorldChildBuilder,
     root_load_context: &LoadContext,

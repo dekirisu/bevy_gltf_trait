@@ -126,7 +126,7 @@ pub mod prelude {
 
 /* -------------------------------- The Trait ------------------------------- */
 
-    pub trait GltfTrait: Send+Sync+'static {
+    pub trait GltfEdit: Send+Sync+'static {
         /// The extensions used by the asset loader
         const EXTENSIONS: &'static [&'static str] = &["gltf", "glb"];
         /// Edit the entity or component of a [DirectionalLight]
@@ -137,7 +137,7 @@ pub mod prelude {
         fn edit_spot_light (_edit:GltfEditLight<SpotLight>){}
     }
     pub struct GltfTraitDefault;
-    impl GltfTrait for () {}
+    impl GltfEdit for () {}
 
 /* --------------------------------- Helpers -------------------------------- */
 
@@ -165,12 +165,12 @@ pub mod prelude {
 
 /// Adds support for glTF file loading to the app.
 #[derive(Default)]
-pub struct GltfPlugin <G:GltfTrait=()> {
+pub struct GltfPlugin <G:GltfEdit=()> {
     custom_vertex_attributes: HashMap<Box<str>, MeshVertexAttribute>,
     phantom: PhantomData<G>
 }
 
-impl <G:GltfTrait> GltfPlugin <G> {
+impl <G:GltfEdit> GltfPlugin <G> {
     /// Register a custom vertex attribute so that it is recognized when loading a glTF file with the [`GltfLoader`].
     ///
     /// `name` must be the attribute name as found in the glTF data, which must start with an underscore.
@@ -186,7 +186,7 @@ impl <G:GltfTrait> GltfPlugin <G> {
     }
 }
 
-impl <G:GltfTrait> Plugin for GltfPlugin <G> {
+impl <G:GltfEdit> Plugin for GltfPlugin <G> {
     fn build(&self, app: &mut App) {
         app.register_type::<GltfExtras>()
             .register_type::<GltfSceneExtras>()
