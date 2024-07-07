@@ -156,9 +156,10 @@ pub mod prelude {
 
     /// Struct to simplify parameters of the [GltfEdit] light parent method
     pub struct GltfEditParent <'a,'b> {
-        pub node:&'b Node<'a>,
+        pub context: &'b LoadContext<'a>,
         pub entity: &'b mut EntityWorldMut<'a>,
-        pub transform: &'b mut Transform
+        pub transform: &'b mut Transform,
+        pub node:&'b Node<'a>
     }
 
     /// Struct to simplify parameters of [GltfEdit]s light methods

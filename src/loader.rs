@@ -1212,9 +1212,10 @@ fn load_node <G:GltfEdit> (
 
     if gltf_node.light().is_some() {
         G::on_light_parent(GltfEditParent{
+            context: load_context,
             entity: &mut node,
             transform: &mut transform,
-            node: &gltf_node
+            node: gltf_node
         });
     }
 
@@ -1394,7 +1395,7 @@ fn load_node <G:GltfEdit> (
                         };
                         let mut entity = parent.spawn_empty();
                         G::edit_directional_light(GltfEditLight::new(
-                            &load_context, &mut entity, &mut light_comp, &gltf_node, &light
+                            load_context, &mut entity, &mut light_comp, gltf_node, &light
                         ));
                         entity.insert(DirectionalLightBundle {
                             directional_light: light_comp,
@@ -1422,7 +1423,7 @@ fn load_node <G:GltfEdit> (
                         };
                         let mut entity = parent.spawn_empty();
                         G::edit_point_light(GltfEditLight::new(
-                            &load_context, &mut entity, &mut light_comp, &gltf_node, &light
+                            load_context, &mut entity, &mut light_comp, gltf_node, &light
                         ));
                         let mut entity = parent.spawn(PointLightBundle {
                             point_light: light_comp,
@@ -1455,7 +1456,7 @@ fn load_node <G:GltfEdit> (
                         };
                         let mut entity = parent.spawn_empty();
                         G::edit_spot_light(GltfEditLight::new(
-                            &load_context, &mut entity, &mut light_comp, &gltf_node, &light
+                            load_context, &mut entity, &mut light_comp, gltf_node, &light
                         ));
                         let mut entity = parent.spawn(SpotLightBundle {
                             spot_light: light_comp,
