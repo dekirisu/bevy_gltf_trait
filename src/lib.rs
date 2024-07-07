@@ -97,16 +97,18 @@
 
 #[cfg(feature = "bevy_animation")]
 use bevy_animation::AnimationClip;
+use bevy_transform::components::Transform;
 use bevy_utils::HashMap;
 
 mod loader;
 mod vertex_attributes;
+use gltf::khr_lights_punctual::Light;
 pub use loader::*;
 
 use bevy_app::prelude::*;
-use bevy_asset::{Asset, AssetApp, AssetPath, Handle};
-use bevy_ecs::{prelude::Component, reflect::ReflectComponent};
-use bevy_pbr::StandardMaterial;
+use bevy_asset::{Asset, AssetApp, AssetPath, Handle, LoadContext};
+use bevy_ecs::{prelude::Component, reflect::ReflectComponent, world::EntityWorldMut};
+use bevy_pbr::{DirectionalLight, PointLight, SpotLight, StandardMaterial};
 use bevy_reflect::{Reflect, TypePath};
 use bevy_render::{
     mesh::{Mesh, MeshVertexAttribute},
@@ -122,12 +124,44 @@ pub mod prelude {
     pub use crate::{Gltf, GltfAssetLabel, GltfExtras};
 }
 
-pub trait GltfTrait: Send+Sync+'static {
-    /// The extensions used by the asset loader
-    const EXTENSIONS: &'static [&'static str] = &["gltf", "glb"];
-}
-pub struct GltfTraitDefault;
-impl GltfTrait for () {}
+/* -------------------------------- The Trait ------------------------------- */
+
+    pub trait GltfTrait: Send+Sync+'static {
+        /// The extensions used by the asset loader
+        const EXTENSIONS: &'static [&'static str] = &["gltf", "glb"];
+        /// Edit the entity or component of a [DirectionalLight]
+        fn edit_directional_light (_edit:GltfEditLight<DirectionalLight>){}
+        /// Edit the entity or component of a [PointLight]
+        fn edit_point_light (_edit:GltfEditLight<PointLight>){}
+        /// Edit the entity or component of a [SpotLight]
+        fn edit_spot_light (_edit:GltfEditLight<SpotLight>){}
+    }
+    pub struct GltfTraitDefault;
+    impl GltfTrait for () {}
+
+/* --------------------------------- Helpers -------------------------------- */
+
+    pub struct GltfEditLight <'a,'b, L> {
+        pub context: &'b LoadContext<'a>,
+        pub entity: &'b mut EntityWorldMut<'a>,
+        pub component: &'b mut L,
+        pub raw: &'b Light<'b>
+    }
+    impl <'a,'b,L> GltfEditLight <'a,'b, L> {
+        pub fn new(
+            context: &'b LoadContext<'a>,
+            entity: &'b mut EntityWorldMut<'a>,
+            component: &'b mut L,
+            raw: &'b Light<'a>
+        ) -> Self { Self {
+            context,
+            entity,
+            component,
+            raw
+        }}
+    }
+
+/* ------------------------------- Traited OG ------------------------------- */
 
 /// Adds support for glTF file loading to the app.
 #[derive(Default)]

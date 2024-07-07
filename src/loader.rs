@@ -1,4 +1,4 @@
-use crate::GltfTrait;
+use crate::{GltfEditLight, GltfTrait};
 use crate::{
     vertex_attributes::convert_attribute, Gltf, GltfAssetLabel, GltfExtras, GltfMaterialExtras,
     GltfMeshExtras, GltfNode, GltfSceneExtras,
@@ -658,7 +658,7 @@ async fn load_gltf<'a, 'b, 'c, G:GltfTrait>(
             .spawn(SpatialBundle::INHERITED_IDENTITY)
             .with_children(|parent| {
                 for node in scene.nodes() {
-                    let result = load_node(
+                    let result = load_node::<G>(
                         &node,
                         parent,
                         load_context,
@@ -1177,7 +1177,7 @@ fn warn_on_differing_texture_transforms(
 
 /// Loads a glTF node.
 #[allow(clippy::too_many_arguments, clippy::result_large_err)]
-fn load_node(
+fn load_node <G:GltfTrait> (
     gltf_node: &Node,
     world_builder: &mut WorldChildBuilder,
     root_load_context: &LoadContext,
@@ -1368,14 +1368,19 @@ fn load_node(
             if let Some(light) = gltf_node.light() {
                 match light.kind() {
                     gltf::khr_lights_punctual::Kind::Directional => {
-                        let mut entity = parent.spawn(DirectionalLightBundle {
-                            directional_light: DirectionalLight {
-                                color: Color::srgb_from_array(light.color()),
-                                // NOTE: KHR_punctual_lights defines the intensity units for directional
-                                // lights in lux (lm/m^2) which is what we need.
-                                illuminance: light.intensity(),
-                                ..Default::default()
-                            },
+                        let mut light_comp = DirectionalLight {
+                            color: Color::srgb_from_array(light.color()),
+                            // NOTE: KHR_punctual_lights defines the intensity units for directional
+                            // lights in lux (lm/m^2) which is what we need.
+                            illuminance: light.intensity(),
+                            ..Default::default()
+                        };
+                        let mut entity = parent.spawn_empty();
+                        G::edit_directional_light(GltfEditLight::new(
+                            &load_context, &mut entity, &mut light_comp, &light
+                        ));
+                        entity.insert(DirectionalLightBundle {
+                            directional_light: light_comp,
                             ..Default::default()
                         });
                         if let Some(name) = light.name() {
@@ -1388,17 +1393,22 @@ fn load_node(
                         }
                     }
                     gltf::khr_lights_punctual::Kind::Point => {
+                        let mut light_comp = PointLight {
+                            color: Color::srgb_from_array(light.color()),
+                            // NOTE: KHR_punctual_lights defines the intensity units for point lights in
+                            // candela (lm/sr) which is luminous intensity and we need luminous power.
+                            // For a point light, luminous power = 4 * pi * luminous intensity
+                            intensity: light.intensity() * std::f32::consts::PI * 4.0,
+                            range: light.range().unwrap_or(20.0),
+                            radius: 0.0,
+                            ..Default::default()
+                        };
+                        let mut entity = parent.spawn_empty();
+                        G::edit_point_light(GltfEditLight::new(
+                            &load_context, &mut entity, &mut light_comp, &light
+                        ));
                         let mut entity = parent.spawn(PointLightBundle {
-                            point_light: PointLight {
-                                color: Color::srgb_from_array(light.color()),
-                                // NOTE: KHR_punctual_lights defines the intensity units for point lights in
-                                // candela (lm/sr) which is luminous intensity and we need luminous power.
-                                // For a point light, luminous power = 4 * pi * luminous intensity
-                                intensity: light.intensity() * std::f32::consts::PI * 4.0,
-                                range: light.range().unwrap_or(20.0),
-                                radius: 0.0,
-                                ..Default::default()
-                            },
+                            point_light: light_comp,
                             ..Default::default()
                         });
                         if let Some(name) = light.name() {
@@ -1414,19 +1424,24 @@ fn load_node(
                         inner_cone_angle,
                         outer_cone_angle,
                     } => {
+                        let mut light_comp = SpotLight {
+                            color: Color::srgb_from_array(light.color()),
+                            // NOTE: KHR_punctual_lights defines the intensity units for spot lights in
+                            // candela (lm/sr) which is luminous intensity and we need luminous power.
+                            // For a spot light, we map luminous power = 4 * pi * luminous intensity
+                            intensity: light.intensity() * std::f32::consts::PI * 4.0,
+                            range: light.range().unwrap_or(20.0),
+                            radius: light.range().unwrap_or(0.0),
+                            inner_angle: inner_cone_angle,
+                            outer_angle: outer_cone_angle,
+                            ..Default::default()
+                        };
+                        let mut entity = parent.spawn_empty();
+                        G::edit_spot_light(GltfEditLight::new(
+                            &load_context, &mut entity, &mut light_comp, &light
+                        ));
                         let mut entity = parent.spawn(SpotLightBundle {
-                            spot_light: SpotLight {
-                                color: Color::srgb_from_array(light.color()),
-                                // NOTE: KHR_punctual_lights defines the intensity units for spot lights in
-                                // candela (lm/sr) which is luminous intensity and we need luminous power.
-                                // For a spot light, we map luminous power = 4 * pi * luminous intensity
-                                intensity: light.intensity() * std::f32::consts::PI * 4.0,
-                                range: light.range().unwrap_or(20.0),
-                                radius: light.range().unwrap_or(0.0),
-                                inner_angle: inner_cone_angle,
-                                outer_angle: outer_cone_angle,
-                                ..Default::default()
-                            },
+                            spot_light: light_comp,
                             ..Default::default()
                         });
                         if let Some(name) = light.name() {
@@ -1444,7 +1459,7 @@ fn load_node(
 
         // append other nodes
         for child in gltf_node.children() {
-            if let Err(err) = load_node(
+            if let Err(err) = load_node::<G>(
                 &child,
                 parent,
                 root_load_context,
