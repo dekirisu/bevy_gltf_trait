@@ -1,4 +1,4 @@
-use crate::{GltfEditLight, GltfEdit};
+use crate::{GltfEdit, GltfEditLight, GltfEditParent};
 use crate::{
     vertex_attributes::convert_attribute, Gltf, GltfAssetLabel, GltfExtras, GltfMaterialExtras,
     GltfMeshExtras, GltfNode, GltfSceneExtras,
@@ -1192,7 +1192,7 @@ fn load_node <G:GltfEdit> (
     document: &Document,
 ) -> Result<(), GltfError> {
     let mut gltf_error = None;
-    let transform = node_transform(gltf_node);
+    let mut transform = node_transform(gltf_node);
     let world_transform = *parent_transform * transform;
     // according to https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#instantiation,
     // if the determinant of the transform is negative we must invert the winding order of
@@ -1201,7 +1201,17 @@ fn load_node <G:GltfEdit> (
     // of negative scale factors is odd. if so we will assign a copy of the material with face
     // culling inverted, rather than modifying the mesh data directly.
     let is_scale_inverted = world_transform.scale.is_negative_bitmask().count_ones() & 1 == 1;
-    let mut node = world_builder.spawn(SpatialBundle::from(transform));
+
+    let mut node = world_builder.spawn_empty();
+
+    if gltf_node.light().is_some() {
+        G::on_light_parent(GltfEditParent{
+            entity: &mut node,
+            transform: &mut transform
+        });
+    }
+
+    node.insert(SpatialBundle::from(transform));
 
     let name = node_name(gltf_node);
     node.insert(name.clone());

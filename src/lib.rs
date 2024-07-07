@@ -129,6 +129,8 @@ pub mod prelude {
     pub trait GltfEdit: Send+Sync+'static {
         /// The extensions used by the asset loader
         const EXTENSIONS: &'static [&'static str] = &["gltf", "glb"];
+        /// Edit the entity or [Transform] of any light
+        fn on_light_parent (_edit:GltfEditParent){}
         /// Edit the entity or component of a [DirectionalLight]
         fn edit_directional_light (_edit:GltfEditLight<DirectionalLight>){}
         /// Edit the entity or component of a [PointLight]
@@ -141,6 +143,13 @@ pub mod prelude {
 
 /* --------------------------------- Helpers -------------------------------- */
 
+    /// Struct to simplify parameters of the [GltfEdit] light parent method
+    pub struct GltfEditParent <'a,'b> {
+        pub entity: &'b mut EntityWorldMut<'a>,
+        pub transform: &'b mut Transform
+    }
+
+    /// Struct to simplify parameters of [GltfEdit]s light methods
     pub struct GltfEditLight <'a,'b, L> {
         pub context: &'b LoadContext<'a>,
         pub entity: &'b mut EntityWorldMut<'a>,
