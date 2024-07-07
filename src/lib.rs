@@ -102,7 +102,7 @@ use bevy_utils::HashMap;
 
 mod loader;
 mod vertex_attributes;
-use gltf::khr_lights_punctual::Light;
+use gltf::{khr_lights_punctual::Light, Primitive};
 pub use loader::*;
 
 use bevy_app::prelude::*;
@@ -139,11 +139,20 @@ pub mod prelude {
         fn edit_point_light (_edit:GltfEditLight<PointLight>){}
         /// Edit the entity or component of a [SpotLight]
         fn edit_spot_light (_edit:GltfEditLight<SpotLight>){}
+        /// Edit meshes
+        fn edit_mesh (_edit:GltfEditMesh){}
     }
     pub struct GltfTraitDefault;
     impl GltfEdit for () {}
 
 /* --------------------------------- Helpers -------------------------------- */
+
+    /// Struct to simplify parameters of the [GltfEdit] light parent method
+    pub struct GltfEditMesh <'a,'b> {
+        pub context: &'b LoadContext<'a>,
+        pub mesh: &'b mut Mesh,
+        pub raw: &'b Primitive<'a>
+    }
 
     /// Struct to simplify parameters of the [GltfEdit] light parent method
     pub struct GltfEditParent <'a,'b> {

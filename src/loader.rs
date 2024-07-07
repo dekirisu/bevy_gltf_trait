@@ -1,4 +1,4 @@
-use crate::{GltfEdit, GltfEditLight, GltfEditParent};
+use crate::{GltfEdit, GltfEditLight, GltfEditMesh, GltfEditParent};
 use crate::{
     vertex_attributes::convert_attribute, Gltf, GltfAssetLabel, GltfExtras, GltfMaterialExtras,
     GltfMeshExtras, GltfNode, GltfSceneExtras,
@@ -566,6 +566,12 @@ async fn load_gltf<'a, 'b, 'c, G:GltfEdit>(
                     }
                 });
             }
+            
+            G::edit_mesh(GltfEditMesh{
+                context: &load_context,
+                mesh: &mut mesh,
+                raw: &primitive
+            });
 
             let mesh_handle = load_context.add_labeled_asset(primitive_label.to_string(), mesh);
             primitives.push(super::GltfPrimitive::new(
