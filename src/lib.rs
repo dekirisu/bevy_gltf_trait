@@ -143,6 +143,10 @@ pub mod prelude {
         fn on_mesh_parent (_edit:GltfEditParent){}      
         /// Edit the entity or [Transform] of a set of skinned meshes 
         fn on_skinned_mesh_parent (_edit:GltfEditParent){}
+        /// Edit the entity of a skinned mesh 
+        fn on_skinned_mesh (_edit:GltfEditEntity){}
+        /// Edit the entity of a mesh
+        fn on_mesh (_edit:GltfEditEntity){}
         /// Edit meshes
         fn edit_mesh (_edit:GltfEditMesh){}
     }
@@ -150,6 +154,13 @@ pub mod prelude {
     impl GltfEdit for () {}
 
 /* --------------------------------- Helpers -------------------------------- */
+    
+    /// Struct to simplify parameters of the [GltfEdit] light parent method
+    pub struct GltfEditEntity <'a,'b> {
+        pub context: &'b LoadContext<'a>,
+        pub entity: &'b mut EntityWorldMut<'a>,
+        pub node:&'b Node<'a>
+    }
 
     /// Struct to simplify parameters of the [GltfEdit] light parent method
     pub struct GltfEditMesh <'a,'b> {

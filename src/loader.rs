@@ -1,4 +1,4 @@
-use crate::{GltfEdit, GltfEditLight, GltfEditMesh, GltfEditParent};
+use crate::{GltfEdit, GltfEditEntity, GltfEditLight, GltfEditMesh, GltfEditParent};
 use crate::{
     vertex_attributes::convert_attribute, Gltf, GltfAssetLabel, GltfExtras, GltfMaterialExtras,
     GltfMeshExtras, GltfNode, GltfSceneExtras,
@@ -1391,8 +1391,19 @@ fn load_node <G:GltfEdit> (
 
                     mesh_entity.insert(Name::new(primitive_name(&mesh, &primitive)));
                     // Mark for adding skinned mesh
-                    if let Some(skin) = gltf_node.skin() {
+                    if let Some(skin) = gltf_node.skin() {                        
+                        G::on_skinned_mesh(GltfEditEntity{
+                            context: load_context,
+                            entity: &mut mesh_entity,
+                            node: gltf_node,
+                        });
                         entity_to_skin_index_map.insert(mesh_entity.id(), skin.index());
+                    } else {                        
+                        G::on_mesh(GltfEditEntity{
+                            context: load_context,
+                            entity: &mut mesh_entity,
+                            node: gltf_node,
+                        });
                     }
                 }
             }
