@@ -129,6 +129,8 @@ pub mod prelude {
     pub trait GltfEdit: Send+Sync+'static {
         /// The extensions used by the asset loader
         const EXTENSIONS: &'static [&'static str] = &["gltf", "glb"];
+        /// Edit the app
+        fn on_app (_app:&mut App){}
         /// Edit the entity or [Transform] of any light
         fn on_light_parent (_edit:GltfEditParent){}
         /// Edit the entity or component of a [DirectionalLight]
@@ -206,6 +208,7 @@ impl <G:GltfEdit> Plugin for GltfPlugin <G> {
             .init_asset::<GltfPrimitive>()
             .init_asset::<GltfMesh>()
             .preregister_asset_loader::<GltfLoader<G>>(G::EXTENSIONS);
+        G::on_app(app);
     }
 
     fn finish(&self, app: &mut App) {
