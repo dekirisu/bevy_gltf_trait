@@ -102,7 +102,7 @@ use bevy_utils::HashMap;
 
 mod loader;
 mod vertex_attributes;
-use gltf::{khr_lights_punctual::Light, Primitive};
+use gltf::{khr_lights_punctual::Light, Node, Primitive};
 pub use loader::*;
 
 use bevy_app::prelude::*;
@@ -156,6 +156,7 @@ pub mod prelude {
 
     /// Struct to simplify parameters of the [GltfEdit] light parent method
     pub struct GltfEditParent <'a,'b> {
+        pub node:&'b Node<'a>,
         pub entity: &'b mut EntityWorldMut<'a>,
         pub transform: &'b mut Transform
     }
@@ -165,6 +166,7 @@ pub mod prelude {
         pub context: &'b LoadContext<'a>,
         pub entity: &'b mut EntityWorldMut<'a>,
         pub component: &'b mut L,
+        pub node:&'b Node<'a>,
         pub raw: &'b Light<'b>
     }
     impl <'a,'b,L> GltfEditLight <'a,'b, L> {
@@ -172,11 +174,13 @@ pub mod prelude {
             context: &'b LoadContext<'a>,
             entity: &'b mut EntityWorldMut<'a>,
             component: &'b mut L,
+            node:&'b Node<'a>,
             raw: &'b Light<'a>
         ) -> Self { Self {
             context,
             entity,
             component,
+            node,
             raw
         }}
     }
