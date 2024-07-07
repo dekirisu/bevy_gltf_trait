@@ -2033,7 +2033,7 @@ mod test {
             TaskPoolPlugin::default(),
             AssetPlugin::default(),
             ScenePlugin,
-            crate::GltfPlugin::default(),
+            crate::GltfPlugin::<()>::default(),
         ));
 
         app.finish();

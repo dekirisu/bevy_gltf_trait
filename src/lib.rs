@@ -95,6 +95,8 @@
 //!
 //! You can use [`GltfAssetLabel`] to ensure you are using the correct label.
 
+use std::marker::PhantomData;
+
 #[cfg(feature = "bevy_animation")]
 use bevy_animation::AnimationClip;
 use bevy_utils::HashMap;
@@ -121,13 +123,18 @@ pub mod prelude {
     pub use crate::{Gltf, GltfAssetLabel, GltfExtras};
 }
 
+pub trait GltfTrait: Send+Sync+'static {}
+pub struct GltfTraitDefault;
+impl GltfTrait for () {}
+
 /// Adds support for glTF file loading to the app.
 #[derive(Default)]
-pub struct GltfPlugin {
+pub struct GltfPlugin <G:GltfTrait=()> {
     custom_vertex_attributes: HashMap<Box<str>, MeshVertexAttribute>,
+    phantom: PhantomData<G>
 }
 
-impl GltfPlugin {
+impl <G:GltfTrait> GltfPlugin <G> {
     /// Register a custom vertex attribute so that it is recognized when loading a glTF file with the [`GltfLoader`].
     ///
     /// `name` must be the attribute name as found in the glTF data, which must start with an underscore.
@@ -143,7 +150,7 @@ impl GltfPlugin {
     }
 }
 
-impl Plugin for GltfPlugin {
+impl <G:GltfTrait> Plugin for GltfPlugin <G> {
     fn build(&self, app: &mut App) {
         app.register_type::<GltfExtras>()
             .register_type::<GltfSceneExtras>()
