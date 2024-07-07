@@ -1,4 +1,4 @@
-use crate::{GltfEdit, GltfEditEntity, GltfEditLight, GltfEditMesh, GltfEditParent};
+use crate::{GltfEdit, GltfEditEntity, GltfEditLight, GltfEditMaterial, GltfEditMesh, GltfEditParent};
 use crate::{
     vertex_attributes::convert_attribute, Gltf, GltfAssetLabel, GltfExtras, GltfMaterialExtras,
     GltfMeshExtras, GltfNode, GltfSceneExtras,
@@ -176,7 +176,7 @@ impl Default for GltfLoaderSettings {
 }
 
 impl <G:GltfEdit> AssetLoader for GltfLoader <G> {
-    type Asset = Gltf;
+    type Asset = Gltf<G>;
     type Settings = GltfLoaderSettings;
     type Error = GltfError;
     fn load<'a>(
@@ -201,7 +201,7 @@ async fn load_gltf<'a, 'b, 'c, G:GltfEdit>(
     bytes: &'a [u8],
     load_context: &'b mut LoadContext<'c>,
     settings: &'b GltfLoaderSettings,
-) -> Result<Gltf, GltfError> {
+) -> Result<Gltf<G>, GltfError> {
     let gltf = gltf::Gltf::from_slice(bytes)?;
     let file_name = load_context
         .asset_path()
@@ -433,7 +433,7 @@ async fn load_gltf<'a, 'b, 'c, G:GltfEdit>(
     if !settings.load_materials.is_empty() {
         // NOTE: materials must be loaded after textures because image load() calls will happen before load_with_settings, preventing is_srgb from being set properly
         for material in gltf.materials() {
-            let handle = load_material(&material, load_context, &gltf.document, false);
+            let handle = load_material::<G>(&material, load_context, &gltf.document, false);
             if let Some(name) = material.name() {
                 named_materials.insert(name.into(), handle.clone());
             }
@@ -627,7 +627,7 @@ async fn load_gltf<'a, 'b, 'c, G:GltfEdit>(
     let nodes = resolve_node_hierarchy(nodes_intermediate)?
         .into_iter()
         .map(|node| load_context.add_labeled_asset(node.asset_label().to_string(), node))
-        .collect::<Vec<Handle<GltfNode>>>();
+        .collect::<Vec<Handle<GltfNode<G>>>>();
     let named_nodes = named_nodes_intermediate
         .into_iter()
         .filter_map(|(name, index)| nodes.get(index).map(|handle| (name.into(), handle.clone())))
@@ -894,12 +894,12 @@ async fn load_image<'a, 'b>(
 }
 
 /// Loads a glTF material as a bevy [`StandardMaterial`] and returns it.
-fn load_material(
+fn load_material <G:GltfEdit> (
     material: &Material,
     load_context: &mut LoadContext,
     document: &Document,
     is_scale_inverted: bool,
-) -> Handle<StandardMaterial> {
+) -> Handle<G::Material> {
     let material_label = material_label(material, is_scale_inverted);
     load_context.labeled_asset_scope(material_label, |load_context| {
         let pbr = material.pbr_metallic_roughness();
@@ -1050,7 +1050,7 @@ fn load_material(
         let base_emissive = LinearRgba::rgb(emissive[0], emissive[1], emissive[2]);
         let emissive = base_emissive * material.emissive_strength().unwrap_or(1.0);
 
-        StandardMaterial {
+        let smaterial = StandardMaterial {
             base_color: Color::linear_rgba(color[0], color[1], color[2], color[3]),
             base_color_channel,
             base_color_texture,
@@ -1115,7 +1115,12 @@ fn load_material(
             #[cfg(feature = "pbr_anisotropy_texture")]
             anisotropy_texture: anisotropy.anisotropy_texture,
             ..Default::default()
-        }
+        };
+        G::convert_material(GltfEditMaterial{
+            context: load_context,
+            material: smaterial,
+            raw: material,
+        })
     })
 }
 
@@ -1225,8 +1230,7 @@ fn load_node <G:GltfEdit> (
             transform: &mut transform,
             node: gltf_node
         });
-    }
-    if gltf_node.skin().is_some() {
+    } else if gltf_node.skin().is_some() {
         G::on_skinned_mesh_parent(GltfEditParent{
             context: load_context,
             entity: &mut node,
@@ -1331,7 +1335,7 @@ fn load_node <G:GltfEdit> (
                     if !root_load_context.has_labeled_asset(&material_label)
                         && !load_context.has_labeled_asset(&material_label)
                     {
-                        load_material(&material, load_context, document, is_scale_inverted);
+                        load_material::<G>(&material, load_context, document, is_scale_inverted);
                     }
 
                     let primitive_label = GltfAssetLabel::Primitive {
@@ -1733,9 +1737,9 @@ async fn load_buffers(
 }
 
 #[allow(clippy::result_large_err)]
-fn resolve_node_hierarchy(
-    nodes_intermediate: Vec<(GltfNode, Vec<(usize, Handle<GltfNode>)>)>,
-) -> Result<Vec<GltfNode>, GltfError> {
+fn resolve_node_hierarchy <G:GltfEdit> (
+    nodes_intermediate: Vec<(GltfNode<G>, Vec<(usize, Handle<GltfNode<G>>)>)>,
+) -> Result<Vec<GltfNode<G>>, GltfError> {
     let mut empty_children = VecDeque::new();
     let mut parents = vec![None; nodes_intermediate.len()];
     let mut unprocessed_nodes = nodes_intermediate
@@ -1753,7 +1757,7 @@ fn resolve_node_hierarchy(
             (i, (node, children))
         })
         .collect::<HashMap<_, _>>();
-    let mut nodes = std::collections::HashMap::<usize, GltfNode>::new();
+    let mut nodes = std::collections::HashMap::<usize, GltfNode<G>>::new();
     while let Some(index) = empty_children.pop_front() {
         let (node, children) = unprocessed_nodes.remove(&index).unwrap();
         assert!(children.is_empty());
@@ -2068,7 +2072,7 @@ fn material_needs_tangents(material: &Material) -> bool {
 mod test {
     use std::path::Path;
 
-    use crate::{Gltf, GltfAssetLabel, GltfNode};
+    use crate::{Gltf, GltfAssetLabel, GltfEdit, GltfNode};
     use bevy_app::App;
     use bevy_asset::{
         io::{
@@ -2116,13 +2120,13 @@ mod test {
         panic!("Ran out of loops to return `Some` from `predicate`");
     }
 
-    fn load_gltf_into_app(gltf_path: &str, gltf: &str) -> App {
+    fn load_gltf_into_app<G:GltfEdit>(gltf_path: &str, gltf: &str) -> App {
         let dir = Dir::default();
         dir.insert_asset_text(Path::new(gltf_path), gltf);
         let mut app = test_app(dir);
         app.update();
         let asset_server = app.world().resource::<AssetServer>().clone();
-        let handle: Handle<Gltf> = asset_server.load(gltf_path.to_string());
+        let handle: Handle<Gltf<G>> = asset_server.load(gltf_path.to_string());
         let handle_id = handle.id();
         app.world_mut().spawn(handle.clone());
         app.update();
@@ -2140,7 +2144,7 @@ mod test {
     #[test]
     fn single_node() {
         let gltf_path = "test.gltf";
-        let app = load_gltf_into_app(
+        let app = load_gltf_into_app::<()>(
             gltf_path,
             r#"
 {
@@ -2159,8 +2163,8 @@ mod test {
         );
         let asset_server = app.world().resource::<AssetServer>();
         let handle = asset_server.load(gltf_path);
-        let gltf_root_assets = app.world().resource::<Assets<Gltf>>();
-        let gltf_node_assets = app.world().resource::<Assets<GltfNode>>();
+        let gltf_root_assets = app.world().resource::<Assets<Gltf<()>>>();
+        let gltf_node_assets = app.world().resource::<Assets<GltfNode<()>>>();
         let gltf_root = gltf_root_assets.get(&handle).unwrap();
         assert!(gltf_root.nodes.len() == 1, "Single node");
         assert!(
@@ -2179,7 +2183,7 @@ mod test {
     #[test]
     fn node_hierarchy_no_hierarchy() {
         let gltf_path = "test.gltf";
-        let app = load_gltf_into_app(
+        let app = load_gltf_into_app::<()>(
             gltf_path,
             r#"
 {
@@ -2201,8 +2205,8 @@ mod test {
         );
         let asset_server = app.world().resource::<AssetServer>();
         let handle = asset_server.load(gltf_path);
-        let gltf_root_assets = app.world().resource::<Assets<Gltf>>();
-        let gltf_node_assets = app.world().resource::<Assets<GltfNode>>();
+        let gltf_root_assets = app.world().resource::<Assets<Gltf<()>>>();
+        let gltf_node_assets = app.world().resource::<Assets<GltfNode<()>>>();
         let gltf_root = gltf_root_assets.get(&handle).unwrap();
         let result = gltf_root
             .nodes
@@ -2219,7 +2223,7 @@ mod test {
     #[test]
     fn node_hierarchy_simple_hierarchy() {
         let gltf_path = "test.gltf";
-        let app = load_gltf_into_app(
+        let app = load_gltf_into_app::<()>(
             gltf_path,
             r#"
 {
@@ -2242,8 +2246,8 @@ mod test {
         );
         let asset_server = app.world().resource::<AssetServer>();
         let handle = asset_server.load(gltf_path);
-        let gltf_root_assets = app.world().resource::<Assets<Gltf>>();
-        let gltf_node_assets = app.world().resource::<Assets<GltfNode>>();
+        let gltf_root_assets = app.world().resource::<Assets<Gltf<()>>>();
+        let gltf_node_assets = app.world().resource::<Assets<GltfNode<()>>>();
         let gltf_root = gltf_root_assets.get(&handle).unwrap();
         let result = gltf_root
             .nodes
@@ -2260,7 +2264,7 @@ mod test {
     #[test]
     fn node_hierarchy_hierarchy() {
         let gltf_path = "test.gltf";
-        let app = load_gltf_into_app(
+        let app = load_gltf_into_app::<()>(
             gltf_path,
             r#"
 {
@@ -2301,8 +2305,8 @@ mod test {
         );
         let asset_server = app.world().resource::<AssetServer>();
         let handle = asset_server.load(gltf_path);
-        let gltf_root_assets = app.world().resource::<Assets<Gltf>>();
-        let gltf_node_assets = app.world().resource::<Assets<GltfNode>>();
+        let gltf_root_assets = app.world().resource::<Assets<Gltf<()>>>();
+        let gltf_node_assets = app.world().resource::<Assets<GltfNode<()>>>();
         let gltf_root = gltf_root_assets.get(&handle).unwrap();
         let result = gltf_root
             .nodes
@@ -2354,7 +2358,7 @@ mod test {
         let mut app = test_app(dir);
         app.update();
         let asset_server = app.world().resource::<AssetServer>().clone();
-        let handle: Handle<Gltf> = asset_server.load(gltf_path);
+        let handle: Handle<Gltf<()>> = asset_server.load(gltf_path);
         let handle_id = handle.id();
         app.world_mut().spawn(handle.clone());
         app.update();
@@ -2397,7 +2401,7 @@ mod test {
         let mut app = test_app(dir);
         app.update();
         let asset_server = app.world().resource::<AssetServer>().clone();
-        let handle: Handle<Gltf> = asset_server.load(gltf_path);
+        let handle: Handle<Gltf<()>> = asset_server.load(gltf_path);
         let handle_id = handle.id();
         app.world_mut().spawn(handle.clone());
         app.update();

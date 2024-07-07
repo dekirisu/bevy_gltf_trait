@@ -108,7 +108,7 @@ pub use loader::*;
 use bevy_app::prelude::*;
 use bevy_asset::{Asset, AssetApp, AssetPath, Handle, LoadContext};
 use bevy_ecs::{prelude::Component, reflect::ReflectComponent, world::EntityWorldMut};
-use bevy_pbr::{DirectionalLight, PointLight, SpotLight, StandardMaterial};
+use bevy_pbr::{DirectionalLight, Material, PointLight, SpotLight, StandardMaterial};
 use bevy_reflect::{Reflect, TypePath};
 use bevy_render::{
     mesh::{Mesh, MeshVertexAttribute},
@@ -116,7 +116,7 @@ use bevy_render::{
     texture::CompressedImageFormats,
 };
 use bevy_scene::Scene;
-use std::marker::PhantomData;
+use std::{fmt::Debug, marker::PhantomData};
 
 /// The `bevy_gltf` prelude.
 pub mod prelude {
@@ -126,9 +126,13 @@ pub mod prelude {
 
 /* -------------------------------- The Trait ------------------------------- */
 
-    pub trait GltfEdit: Send+Sync+'static {
+    pub trait GltfEdit: Send+Sync+'static+TypePath {
         /// The extensions used by the asset loader
         const EXTENSIONS: &'static [&'static str] = &["gltf", "glb"];
+        /// Actual Material attached to Entities
+        type Material:Material+Debug;
+        /// convert materials
+        fn convert_material (convert:GltfEditMaterial) -> Self::Material;
         /// Edit the app
         fn on_app (_app:&mut App){}
         /// Edit the entity or [Transform] of any light
@@ -148,13 +152,26 @@ pub mod prelude {
         /// Edit the entity of a mesh
         fn on_mesh (_edit:GltfEditEntity){}
         /// Edit meshes
-        fn edit_mesh (_edit:GltfEditMesh){}
+        fn edit_mesh (_edit:GltfEditMesh){}        
+
     }
     pub struct GltfTraitDefault;
-    impl GltfEdit for () {}
+    impl GltfEdit for () {
+        type Material = StandardMaterial;        
+        fn convert_material (convert:GltfEditMaterial) -> Self::Material {
+            convert.material
+        }
+    }
 
 /* --------------------------------- Helpers -------------------------------- */
     
+    /// Struct to simplify parameters of the [GltfEdit] light parent method
+    pub struct GltfEditMaterial <'a,'b> {
+        pub context: &'b LoadContext<'a>,
+        pub material: StandardMaterial,
+        pub raw:&'b gltf::Material<'a>
+    }
+
     /// Struct to simplify parameters of the [GltfEdit] light parent method
     pub struct GltfEditEntity <'a,'b> {
         pub context: &'b LoadContext<'a>,
@@ -232,10 +249,10 @@ impl <G:GltfEdit> Plugin for GltfPlugin <G> {
             .register_type::<GltfSceneExtras>()
             .register_type::<GltfMeshExtras>()
             .register_type::<GltfMaterialExtras>()
-            .init_asset::<Gltf>()
-            .init_asset::<GltfNode>()
-            .init_asset::<GltfPrimitive>()
-            .init_asset::<GltfMesh>()
+            .init_asset::<Gltf<G>>()
+            .init_asset::<GltfNode<G>>()
+            .init_asset::<GltfPrimitive<G>>()
+            .init_asset::<GltfMesh<G>>()
             .preregister_asset_loader::<GltfLoader<G>>(G::EXTENSIONS);
         G::on_app(app);
     }
@@ -255,23 +272,23 @@ impl <G:GltfEdit> Plugin for GltfPlugin <G> {
 
 /// Representation of a loaded glTF file.
 #[derive(Asset, Debug, TypePath)]
-pub struct Gltf {
+pub struct Gltf <G:GltfEdit> {
     /// All scenes loaded from the glTF file.
     pub scenes: Vec<Handle<Scene>>,
     /// Named scenes loaded from the glTF file.
     pub named_scenes: HashMap<Box<str>, Handle<Scene>>,
     /// All meshes loaded from the glTF file.
-    pub meshes: Vec<Handle<GltfMesh>>,
+    pub meshes: Vec<Handle<GltfMesh<G>>>,
     /// Named meshes loaded from the glTF file.
-    pub named_meshes: HashMap<Box<str>, Handle<GltfMesh>>,
+    pub named_meshes: HashMap<Box<str>, Handle<GltfMesh<G>>>,
     /// All materials loaded from the glTF file.
-    pub materials: Vec<Handle<StandardMaterial>>,
+    pub materials: Vec<Handle<G::Material>>,
     /// Named materials loaded from the glTF file.
-    pub named_materials: HashMap<Box<str>, Handle<StandardMaterial>>,
+    pub named_materials: HashMap<Box<str>, Handle<G::Material>>,
     /// All nodes loaded from the glTF file.
-    pub nodes: Vec<Handle<GltfNode>>,
+    pub nodes: Vec<Handle<GltfNode<G>>>,
     /// Named nodes loaded from the glTF file.
-    pub named_nodes: HashMap<Box<str>, Handle<GltfNode>>,
+    pub named_nodes: HashMap<Box<str>, Handle<GltfNode<G>>>,
     /// Default scene to be displayed.
     pub default_scene: Option<Handle<Scene>>,
     /// All animations loaded from the glTF file.
@@ -289,27 +306,27 @@ pub struct Gltf {
 ///
 /// See [the relevant glTF specification section](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-node).
 #[derive(Asset, Debug, Clone, TypePath)]
-pub struct GltfNode {
+pub struct GltfNode <G:GltfEdit> {
     /// Index of the node inside the scene
     pub index: usize,
     /// Computed name for a node - either a user defined node name from gLTF or a generated name from index
     pub name: String,
     /// Direct children of the node.
-    pub children: Vec<Handle<GltfNode>>,
+    pub children: Vec<Handle<GltfNode<G>>>,
     /// Mesh of the node.
-    pub mesh: Option<Handle<GltfMesh>>,
+    pub mesh: Option<Handle<GltfMesh<G>>>,
     /// Local transform.
     pub transform: bevy_transform::prelude::Transform,
     /// Additional data.
     pub extras: Option<GltfExtras>,
 }
 
-impl GltfNode {
+impl <G:GltfEdit> GltfNode <G> {
     /// Create a node extracting name and index from glTF def
     pub fn new(
         node: &gltf::Node,
-        children: Vec<Handle<GltfNode>>,
-        mesh: Option<Handle<GltfMesh>>,
+        children: Vec<Handle<GltfNode<G>>>,
+        mesh: Option<Handle<GltfMesh<G>>>,
         transform: bevy_transform::prelude::Transform,
         extras: Option<GltfExtras>,
     ) -> Self {
@@ -338,22 +355,22 @@ impl GltfNode {
 ///
 /// See [the relevant glTF specification section](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-mesh).
 #[derive(Asset, Debug, Clone, TypePath)]
-pub struct GltfMesh {
+pub struct GltfMesh <G:GltfEdit> {
     /// Index of the mesh inside the scene
     pub index: usize,
     /// Computed name for a mesh - either a user defined mesh name from gLTF or a generated name from index
     pub name: String,
     /// Primitives of the glTF mesh.
-    pub primitives: Vec<GltfPrimitive>,
+    pub primitives: Vec<GltfPrimitive<G>>,
     /// Additional data.
     pub extras: Option<GltfExtras>,
 }
 
-impl GltfMesh {
+impl <G:GltfEdit> GltfMesh <G> {
     /// Create a mesh extracting name and index from glTF def
     pub fn new(
         mesh: &gltf::Mesh,
-        primitives: Vec<GltfPrimitive>,
+        primitives: Vec<GltfPrimitive<G>>,
         extras: Option<GltfExtras>,
     ) -> Self {
         Self {
@@ -378,7 +395,7 @@ impl GltfMesh {
 ///
 /// See [the relevant glTF specification section](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-mesh-primitive).
 #[derive(Asset, Debug, Clone, TypePath)]
-pub struct GltfPrimitive {
+pub struct GltfPrimitive <G:GltfEdit> {
     /// Index of the primitive inside the mesh
     pub index: usize,
     /// Index of the parent [`GltfMesh`] of this primitive
@@ -388,20 +405,20 @@ pub struct GltfPrimitive {
     /// Topology to be rendered.
     pub mesh: Handle<Mesh>,
     /// Material to apply to the `mesh`.
-    pub material: Option<Handle<StandardMaterial>>,
+    pub material: Option<Handle<G::Material>>,
     /// Additional data.
     pub extras: Option<GltfExtras>,
     /// Additional data of the `material`.
     pub material_extras: Option<GltfExtras>,
 }
 
-impl GltfPrimitive {
+impl <G:GltfEdit> GltfPrimitive <G> {
     /// Create a primitive extracting name and index from glTF def
     pub fn new(
         gltf_mesh: &gltf::Mesh,
         gltf_primitive: &gltf::Primitive,
         mesh: Handle<Mesh>,
-        material: Option<Handle<StandardMaterial>>,
+        material: Option<Handle<G::Material>>,
         extras: Option<GltfExtras>,
         material_extras: Option<GltfExtras>,
     ) -> Self {
