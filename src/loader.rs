@@ -1218,6 +1218,22 @@ fn load_node <G:GltfEdit> (
             node: gltf_node
         });
     }
+    if gltf_node.mesh().is_some() {
+        G::on_mesh_parent(GltfEditParent{
+            context: load_context,
+            entity: &mut node,
+            transform: &mut transform,
+            node: gltf_node
+        });
+    }
+    if gltf_node.skin().is_some() {
+        G::on_skinned_mesh_parent(GltfEditParent{
+            context: load_context,
+            entity: &mut node,
+            transform: &mut transform,
+            node: gltf_node
+        });
+    }
 
     node.insert(SpatialBundle::from(transform));
 

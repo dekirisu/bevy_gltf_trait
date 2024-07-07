@@ -138,7 +138,11 @@ pub mod prelude {
         /// Edit the entity or component of a [PointLight]
         fn edit_point_light (_edit:GltfEditLight<PointLight>){}
         /// Edit the entity or component of a [SpotLight]
-        fn edit_spot_light (_edit:GltfEditLight<SpotLight>){}
+        fn edit_spot_light (_edit:GltfEditLight<SpotLight>){}        
+        /// Edit the entity or [Transform] of a set of meshes 
+        fn on_mesh_parent (_edit:GltfEditParent){}      
+        /// Edit the entity or [Transform] of a set of skinned meshes 
+        fn on_skinned_mesh_parent (_edit:GltfEditParent){}
         /// Edit meshes
         fn edit_mesh (_edit:GltfEditMesh){}
     }
