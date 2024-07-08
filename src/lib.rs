@@ -130,7 +130,7 @@ pub mod prelude {
         /// The extensions used by the asset loader
         const EXTENSIONS: &'static [&'static str] = &["gltf", "glb"];
         /// Actual Material attached to Entities
-        type Material:Material+Debug;
+        type Material:Material;
         /// convert materials
         fn convert_material (convert:GltfTraitMaterial) -> Self::Material;
         /// Edit the app
@@ -354,7 +354,7 @@ impl <G:GltfTrait> GltfNode <G> {
 /// and an optional [`GltfExtras`].
 ///
 /// See [the relevant glTF specification section](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-mesh).
-#[derive(Asset, Debug, Clone, TypePath)]
+#[derive(Asset, Clone, TypePath)]
 pub struct GltfMesh <G:GltfTrait> {
     /// Index of the mesh inside the scene
     pub index: usize,
