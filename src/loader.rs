@@ -1,4 +1,4 @@
-use crate::{GltfEdit, GltfEditEntity, GltfEditLight, GltfEditMaterial, GltfEditMesh, GltfEditParent};
+use crate::{GltfTrait, GltfTraitEntity, GltfTraitLight, GltfTraitMaterial, GltfTraitMesh, GltfTraitParent};
 use crate::{
     vertex_attributes::convert_attribute, Gltf, GltfAssetLabel, GltfExtras, GltfMaterialExtras,
     GltfMeshExtras, GltfNode, GltfSceneExtras,
@@ -116,7 +116,7 @@ pub enum GltfError {
 }
 
 /// Loads glTF files with all of their data as their corresponding bevy representations.
-pub struct GltfLoader  <G:GltfEdit> {
+pub struct GltfLoader  <G:GltfTrait> {
     /// List of compressed image formats handled by the loader.
     pub supported_compressed_formats: CompressedImageFormats,
     /// Custom vertex attributes that will be recognized when loading a glTF file.
@@ -175,7 +175,7 @@ impl Default for GltfLoaderSettings {
     }
 }
 
-impl <G:GltfEdit> AssetLoader for GltfLoader <G> {
+impl <G:GltfTrait> AssetLoader for GltfLoader <G> {
     type Asset = Gltf<G>;
     type Settings = GltfLoaderSettings;
     type Error = GltfError;
@@ -196,7 +196,7 @@ impl <G:GltfEdit> AssetLoader for GltfLoader <G> {
 }
 
 /// Loads an entire glTF file.
-async fn load_gltf<'a, 'b, 'c, G:GltfEdit>(
+async fn load_gltf<'a, 'b, 'c, G:GltfTrait>(
     loader: &GltfLoader<G>,
     bytes: &'a [u8],
     load_context: &'b mut LoadContext<'c>,
@@ -567,7 +567,7 @@ async fn load_gltf<'a, 'b, 'c, G:GltfEdit>(
                 });
             }
             
-            G::edit_mesh(GltfEditMesh{
+            G::edit_mesh(GltfTraitMesh{
                 context: &load_context,
                 mesh: &mut mesh,
                 raw: &primitive
@@ -894,7 +894,7 @@ async fn load_image<'a, 'b>(
 }
 
 /// Loads a glTF material as a bevy [`StandardMaterial`] and returns it.
-fn load_material <G:GltfEdit> (
+fn load_material <G:GltfTrait> (
     material: &Material,
     load_context: &mut LoadContext,
     document: &Document,
@@ -1116,7 +1116,7 @@ fn load_material <G:GltfEdit> (
             anisotropy_texture: anisotropy.anisotropy_texture,
             ..Default::default()
         };
-        G::convert_material(GltfEditMaterial{
+        G::convert_material(GltfTraitMaterial{
             context: load_context,
             material: smaterial,
             raw: material,
@@ -1188,7 +1188,7 @@ fn warn_on_differing_texture_transforms(
 
 /// Loads a glTF node.
 #[allow(clippy::too_many_arguments, clippy::result_large_err)]
-fn load_node <G:GltfEdit> (
+fn load_node <G:GltfTrait> (
     gltf_node: &Node,
     world_builder: &mut WorldChildBuilder,
     root_load_context: &LoadContext,
@@ -1216,7 +1216,7 @@ fn load_node <G:GltfEdit> (
     let mut node = world_builder.spawn_empty();
 
     if gltf_node.light().is_some() {
-        G::on_light_parent(GltfEditParent{
+        G::on_light_parent(GltfTraitParent{
             context: load_context,
             entity: &mut node,
             transform: &mut transform,
@@ -1224,14 +1224,14 @@ fn load_node <G:GltfEdit> (
         });
     }
     if gltf_node.mesh().is_some() {
-        G::on_mesh_parent(GltfEditParent{
+        G::on_mesh_parent(GltfTraitParent{
             context: load_context,
             entity: &mut node,
             transform: &mut transform,
             node: gltf_node
         });
     } else if gltf_node.skin().is_some() {
-        G::on_skinned_mesh_parent(GltfEditParent{
+        G::on_skinned_mesh_parent(GltfTraitParent{
             context: load_context,
             entity: &mut node,
             transform: &mut transform,
@@ -1396,14 +1396,14 @@ fn load_node <G:GltfEdit> (
                     mesh_entity.insert(Name::new(primitive_name(&mesh, &primitive)));
                     // Mark for adding skinned mesh
                     if let Some(skin) = gltf_node.skin() {                        
-                        G::on_skinned_mesh(GltfEditEntity{
+                        G::on_skinned_mesh(GltfTraitEntity{
                             context: load_context,
                             entity: &mut mesh_entity,
                             node: gltf_node,
                         });
                         entity_to_skin_index_map.insert(mesh_entity.id(), skin.index());
                     } else {                        
-                        G::on_mesh(GltfEditEntity{
+                        G::on_mesh(GltfTraitEntity{
                             context: load_context,
                             entity: &mut mesh_entity,
                             node: gltf_node,
@@ -1425,7 +1425,7 @@ fn load_node <G:GltfEdit> (
                             ..Default::default()
                         };
                         let mut entity = parent.spawn_empty();
-                        G::edit_directional_light(GltfEditLight::new(
+                        G::edit_directional_light(GltfTraitLight::new(
                             load_context, &mut entity, &mut light_comp, gltf_node, &light
                         ));
                         entity.insert(DirectionalLightBundle {
@@ -1453,7 +1453,7 @@ fn load_node <G:GltfEdit> (
                             ..Default::default()
                         };
                         let mut entity = parent.spawn_empty();
-                        G::edit_point_light(GltfEditLight::new(
+                        G::edit_point_light(GltfTraitLight::new(
                             load_context, &mut entity, &mut light_comp, gltf_node, &light
                         ));
                         let mut entity = parent.spawn(PointLightBundle {
@@ -1486,7 +1486,7 @@ fn load_node <G:GltfEdit> (
                             ..Default::default()
                         };
                         let mut entity = parent.spawn_empty();
-                        G::edit_spot_light(GltfEditLight::new(
+                        G::edit_spot_light(GltfTraitLight::new(
                             load_context, &mut entity, &mut light_comp, gltf_node, &light
                         ));
                         let mut entity = parent.spawn(SpotLightBundle {
@@ -1737,7 +1737,7 @@ async fn load_buffers(
 }
 
 #[allow(clippy::result_large_err)]
-fn resolve_node_hierarchy <G:GltfEdit> (
+fn resolve_node_hierarchy <G:GltfTrait> (
     nodes_intermediate: Vec<(GltfNode<G>, Vec<(usize, Handle<GltfNode<G>>)>)>,
 ) -> Result<Vec<GltfNode<G>>, GltfError> {
     let mut empty_children = VecDeque::new();
@@ -2072,7 +2072,7 @@ fn material_needs_tangents(material: &Material) -> bool {
 mod test {
     use std::path::Path;
 
-    use crate::{Gltf, GltfAssetLabel, GltfEdit, GltfNode};
+    use crate::{Gltf, GltfAssetLabel, GltfTrait, GltfNode};
     use bevy_app::App;
     use bevy_asset::{
         io::{
@@ -2120,7 +2120,7 @@ mod test {
         panic!("Ran out of loops to return `Some` from `predicate`");
     }
 
-    fn load_gltf_into_app<G:GltfEdit>(gltf_path: &str, gltf: &str) -> App {
+    fn load_gltf_into_app<G:GltfTrait>(gltf_path: &str, gltf: &str) -> App {
         let dir = Dir::default();
         dir.insert_asset_text(Path::new(gltf_path), gltf);
         let mut app = test_app(dir);

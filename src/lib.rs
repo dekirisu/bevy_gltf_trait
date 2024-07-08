@@ -126,83 +126,83 @@ pub mod prelude {
 
 /* -------------------------------- The Trait ------------------------------- */
 
-    pub trait GltfEdit: Send+Sync+'static+TypePath {
+    pub trait GltfTrait: Send+Sync+'static+TypePath {
         /// The extensions used by the asset loader
         const EXTENSIONS: &'static [&'static str] = &["gltf", "glb"];
         /// Actual Material attached to Entities
         type Material:Material+Debug;
         /// convert materials
-        fn convert_material (convert:GltfEditMaterial) -> Self::Material;
+        fn convert_material (convert:GltfTraitMaterial) -> Self::Material;
         /// Edit the app
         fn on_app (_app:&mut App){}
         /// Edit the entity or [Transform] of any light
-        fn on_light_parent (_edit:GltfEditParent){}
+        fn on_light_parent (_edit:GltfTraitParent){}
         /// Edit the entity or component of a [DirectionalLight]
-        fn edit_directional_light (_edit:GltfEditLight<DirectionalLight>){}
+        fn edit_directional_light (_edit:GltfTraitLight<DirectionalLight>){}
         /// Edit the entity or component of a [PointLight]
-        fn edit_point_light (_edit:GltfEditLight<PointLight>){}
+        fn edit_point_light (_edit:GltfTraitLight<PointLight>){}
         /// Edit the entity or component of a [SpotLight]
-        fn edit_spot_light (_edit:GltfEditLight<SpotLight>){}        
+        fn edit_spot_light (_edit:GltfTraitLight<SpotLight>){}        
         /// Edit the entity or [Transform] of a set of meshes 
-        fn on_mesh_parent (_edit:GltfEditParent){}      
+        fn on_mesh_parent (_edit:GltfTraitParent){}      
         /// Edit the entity or [Transform] of a set of skinned meshes 
-        fn on_skinned_mesh_parent (_edit:GltfEditParent){}
+        fn on_skinned_mesh_parent (_edit:GltfTraitParent){}
         /// Edit the entity of a skinned mesh 
-        fn on_skinned_mesh (_edit:GltfEditEntity){}
+        fn on_skinned_mesh (_edit:GltfTraitEntity){}
         /// Edit the entity of a mesh
-        fn on_mesh (_edit:GltfEditEntity){}
+        fn on_mesh (_edit:GltfTraitEntity){}
         /// Edit meshes
-        fn edit_mesh (_edit:GltfEditMesh){}        
+        fn edit_mesh (_edit:GltfTraitMesh){}        
 
     }
     pub struct GltfTraitDefault;
-    impl GltfEdit for () {
+    impl GltfTrait for () {
         type Material = StandardMaterial;        
-        fn convert_material (convert:GltfEditMaterial) -> Self::Material {
+        fn convert_material (convert:GltfTraitMaterial) -> Self::Material {
             convert.material
         }
     }
 
 /* --------------------------------- Helpers -------------------------------- */
     
-    /// Struct to simplify parameters of the [GltfEdit] light parent method
-    pub struct GltfEditMaterial <'a,'b> {
+    /// Struct to simplify parameters of the [GltfTrait] light parent method
+    pub struct GltfTraitMaterial <'a,'b> {
         pub context: &'b LoadContext<'a>,
         pub material: StandardMaterial,
         pub raw:&'b gltf::Material<'a>
     }
 
-    /// Struct to simplify parameters of the [GltfEdit] light parent method
-    pub struct GltfEditEntity <'a,'b> {
+    /// Struct to simplify parameters of the [GltfTrait] light parent method
+    pub struct GltfTraitEntity <'a,'b> {
         pub context: &'b LoadContext<'a>,
         pub entity: &'b mut EntityWorldMut<'a>,
         pub node:&'b Node<'a>
     }
 
-    /// Struct to simplify parameters of the [GltfEdit] light parent method
-    pub struct GltfEditMesh <'a,'b> {
+    /// Struct to simplify parameters of the [GltfTrait] light parent method
+    pub struct GltfTraitMesh <'a,'b> {
         pub context: &'b LoadContext<'a>,
         pub mesh: &'b mut Mesh,
         pub raw: &'b Primitive<'a>
     }
 
-    /// Struct to simplify parameters of the [GltfEdit] light parent method
-    pub struct GltfEditParent <'a,'b> {
+    /// Struct to simplify parameters of the [GltfTrait] light parent method
+    pub struct GltfTraitParent <'a,'b> {
         pub context: &'b LoadContext<'a>,
         pub entity: &'b mut EntityWorldMut<'a>,
         pub transform: &'b mut Transform,
         pub node:&'b Node<'a>
     }
 
-    /// Struct to simplify parameters of [GltfEdit]s light methods
-    pub struct GltfEditLight <'a,'b, L> {
+    /// Struct to simplify parameters of [GltfTrait]s light methods
+    pub struct GltfTraitLight <'a,'b, L> {
         pub context: &'b LoadContext<'a>,
         pub entity: &'b mut EntityWorldMut<'a>,
         pub component: &'b mut L,
         pub node:&'b Node<'a>,
         pub raw: &'b Light<'b>
     }
-    impl <'a,'b,L> GltfEditLight <'a,'b, L> {
+    impl <'a,'b,L> GltfTraitLight <'a,'b, L> {
         pub fn new(
             context: &'b LoadContext<'a>,
             entity: &'b mut EntityWorldMut<'a>,
@@ -222,12 +222,12 @@ pub mod prelude {
 
 /// Adds support for glTF file loading to the app.
 #[derive(Default)]
-pub struct GltfPlugin <G:GltfEdit=()> {
+pub struct GltfPlugin <G:GltfTrait=()> {
     custom_vertex_attributes: HashMap<Box<str>, MeshVertexAttribute>,
     phantom: PhantomData<G>
 }
 
-impl <G:GltfEdit> GltfPlugin <G> {
+impl <G:GltfTrait> GltfPlugin <G> {
     /// Register a custom vertex attribute so that it is recognized when loading a glTF file with the [`GltfLoader`].
     ///
     /// `name` must be the attribute name as found in the glTF data, which must start with an underscore.
@@ -243,7 +243,7 @@ impl <G:GltfEdit> GltfPlugin <G> {
     }
 }
 
-impl <G:GltfEdit> Plugin for GltfPlugin <G> {
+impl <G:GltfTrait> Plugin for GltfPlugin <G> {
     fn build(&self, app: &mut App) {
         app.register_type::<GltfExtras>()
             .register_type::<GltfSceneExtras>()
@@ -272,7 +272,7 @@ impl <G:GltfEdit> Plugin for GltfPlugin <G> {
 
 /// Representation of a loaded glTF file.
 #[derive(Asset, Debug, TypePath)]
-pub struct Gltf <G:GltfEdit> {
+pub struct Gltf <G:GltfTrait> {
     /// All scenes loaded from the glTF file.
     pub scenes: Vec<Handle<Scene>>,
     /// Named scenes loaded from the glTF file.
@@ -306,7 +306,7 @@ pub struct Gltf <G:GltfEdit> {
 ///
 /// See [the relevant glTF specification section](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-node).
 #[derive(Asset, Debug, Clone, TypePath)]
-pub struct GltfNode <G:GltfEdit> {
+pub struct GltfNode <G:GltfTrait> {
     /// Index of the node inside the scene
     pub index: usize,
     /// Computed name for a node - either a user defined node name from gLTF or a generated name from index
@@ -321,7 +321,7 @@ pub struct GltfNode <G:GltfEdit> {
     pub extras: Option<GltfExtras>,
 }
 
-impl <G:GltfEdit> GltfNode <G> {
+impl <G:GltfTrait> GltfNode <G> {
     /// Create a node extracting name and index from glTF def
     pub fn new(
         node: &gltf::Node,
@@ -355,7 +355,7 @@ impl <G:GltfEdit> GltfNode <G> {
 ///
 /// See [the relevant glTF specification section](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-mesh).
 #[derive(Asset, Debug, Clone, TypePath)]
-pub struct GltfMesh <G:GltfEdit> {
+pub struct GltfMesh <G:GltfTrait> {
     /// Index of the mesh inside the scene
     pub index: usize,
     /// Computed name for a mesh - either a user defined mesh name from gLTF or a generated name from index
@@ -366,7 +366,7 @@ pub struct GltfMesh <G:GltfEdit> {
     pub extras: Option<GltfExtras>,
 }
 
-impl <G:GltfEdit> GltfMesh <G> {
+impl <G:GltfTrait> GltfMesh <G> {
     /// Create a mesh extracting name and index from glTF def
     pub fn new(
         mesh: &gltf::Mesh,
@@ -395,7 +395,7 @@ impl <G:GltfEdit> GltfMesh <G> {
 ///
 /// See [the relevant glTF specification section](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-mesh-primitive).
 #[derive(Asset, Debug, Clone, TypePath)]
-pub struct GltfPrimitive <G:GltfEdit> {
+pub struct GltfPrimitive <G:GltfTrait> {
     /// Index of the primitive inside the mesh
     pub index: usize,
     /// Index of the parent [`GltfMesh`] of this primitive
@@ -412,7 +412,7 @@ pub struct GltfPrimitive <G:GltfEdit> {
     pub material_extras: Option<GltfExtras>,
 }
 
-impl <G:GltfEdit> GltfPrimitive <G> {
+impl <G:GltfTrait> GltfPrimitive <G> {
     /// Create a primitive extracting name and index from glTF def
     pub fn new(
         gltf_mesh: &gltf::Mesh,
