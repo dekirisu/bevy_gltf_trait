@@ -1,6 +1,6 @@
 [package]
 name = "bevy_gltf_trait"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Customizable Bevy Engine GLTF loading"
 repository = "https://github.com/dekirisu/bevy_gltf_trait"
