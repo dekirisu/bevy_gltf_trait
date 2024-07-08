@@ -18,8 +18,7 @@ use bevy_ecs::{entity::Entity, world::World};
 use bevy_hierarchy::{BuildWorldChildren, WorldChildBuilder};
 use bevy_math::{Affine2, Mat4, Vec3};
 use bevy_pbr::{
-    DirectionalLight, DirectionalLightBundle, PbrBundle, PointLight, PointLightBundle, SpotLight,
-    SpotLightBundle, StandardMaterial, UvChannel, MAX_JOINTS,
+    DirectionalLight, DirectionalLightBundle, MaterialMeshBundle, PointLight, PointLightBundle, SpotLight, SpotLightBundle, StandardMaterial, UvChannel, MAX_JOINTS
 };
 use bevy_render::{
     alpha::AlphaMode,
@@ -1344,7 +1343,7 @@ fn load_node <G:GltfTrait> (
                     };
                     let bounds = primitive.bounding_box();
 
-                    let mut mesh_entity = parent.spawn(PbrBundle {
+                    let mut mesh_entity = parent.spawn(MaterialMeshBundle::<G::Material>{
                         // TODO: handle missing label handle errors here?
                         mesh: load_context.get_label_handle(primitive_label.to_string()),
                         material: load_context.get_label_handle(&material_label),
