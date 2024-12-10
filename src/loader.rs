@@ -1,6 +1,7 @@
 use crate::{
     vertex_attributes::convert_attribute, Gltf, GltfAssetLabel, GltfExtras, GltfMaterialExtras,
     GltfMaterialName, GltfMeshExtras, GltfNode, GltfSceneExtras, GltfSkin, GltfTrait,
+    ext::*
 };
 
 use alloc::collections::VecDeque;
@@ -192,9 +193,7 @@ impl <G:GltfTrait> AssetLoader for GltfLoader <G> {
         load_gltf(self, &bytes, load_context, settings).await
     }
 
-    fn extensions(&self) -> &[&str] {
-        &["gltf", "glb"]
-    }
+    fn extensions(&self) -> &[&str] {G::EXTENSIONS}
 }
 
 /// Loads an entire glTF file.
@@ -740,6 +739,12 @@ async fn load_gltf<'a, 'b, 'c, G:GltfTrait>(
                     }
                 });
             }
+
+            G::edit_mesh(GltfTraitMesh{
+                context: &load_context,
+                mesh: &mut mesh,
+                raw: &primitive
+            }); 
 
             let mesh_handle = load_context.add_labeled_asset(primitive_label.to_string(), mesh);
             primitives.push(super::GltfPrimitive::new(
@@ -1390,7 +1395,7 @@ fn load_node <G:GltfTrait> (
     document: &Document,
 ) -> Result<(), GltfError> {
     let mut gltf_error = None;
-    let transform = node_transform(gltf_node);
+    let mut transform = node_transform(gltf_node);
     let world_transform = *parent_transform * transform;
     // according to https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#instantiation,
     // if the determinant of the transform is negative we must invert the winding order of
@@ -1399,7 +1404,33 @@ fn load_node <G:GltfTrait> (
     // of negative scale factors is odd. if so we will assign a copy of the material with face
     // culling inverted, rather than modifying the mesh data directly.
     let is_scale_inverted = world_transform.scale.is_negative_bitmask().count_ones() & 1 == 1;
-    let mut node = world_builder.spawn((transform, Visibility::default()));
+    let mut node = world_builder.spawn(Visibility::default());
+
+    if gltf_node.light().is_some() {
+        G::on_light_parent(GltfTraitParent{
+            context: load_context,
+            entity: &mut node,
+            transform: &mut transform,
+            node: gltf_node
+        });
+    }
+    if gltf_node.mesh().is_some() {
+        G::on_mesh_parent(GltfTraitParent{
+            context: load_context,
+            entity: &mut node,
+            transform: &mut transform,
+            node: gltf_node
+        });
+    } else if gltf_node.skin().is_some() {
+        G::on_skinned_mesh_parent(GltfTraitParent{
+            context: load_context,
+            entity: &mut node,
+            transform: &mut transform,
+            node: gltf_node
+        });
+    }
+
+    node.insert(transform);
 
     let name = node_name(gltf_node);
     node.insert(name.clone());
@@ -1562,7 +1593,18 @@ fn load_node <G:GltfTrait> (
                     mesh_entity.insert(Name::new(primitive_name(&mesh, &primitive)));
                     // Mark for adding skinned mesh
                     if let Some(skin) = gltf_node.skin() {
+                        G::on_skinned_mesh(GltfTraitEntity{
+                            context: load_context,
+                            entity: &mut mesh_entity,
+                            node: gltf_node,
+                        });
                         entity_to_skin_index_map.insert(mesh_entity.id(), skin.index());
+                    } else {                        
+                        G::on_mesh(GltfTraitEntity{
+                            context: load_context,
+                            entity: &mut mesh_entity,
+                            node: gltf_node,
+                        });
                     }
                 }
             }
@@ -1572,13 +1614,18 @@ fn load_node <G:GltfTrait> (
             if let Some(light) = gltf_node.light() {
                 match light.kind() {
                     gltf::khr_lights_punctual::Kind::Directional => {
-                        let mut entity = parent.spawn(DirectionalLight {
+                        let mut light_comp = DirectionalLight {
                             color: Color::srgb_from_array(light.color()),
                             // NOTE: KHR_punctual_lights defines the intensity units for directional
                             // lights in lux (lm/m^2) which is what we need.
                             illuminance: light.intensity(),
                             ..Default::default()
-                        });
+                        };
+                        let mut entity = parent.spawn_empty();
+                        G::edit_directional_light(GltfTraitLight::new(
+                            load_context, &mut entity, &mut light_comp, gltf_node, &light
+                        ));
+                        entity.insert(light_comp);
                         if let Some(name) = light.name() {
                             entity.insert(Name::new(name.to_string()));
                         }
@@ -1589,7 +1636,7 @@ fn load_node <G:GltfTrait> (
                         }
                     }
                     gltf::khr_lights_punctual::Kind::Point => {
-                        let mut entity = parent.spawn(PointLight {
+                        let mut light_comp = PointLight {
                             color: Color::srgb_from_array(light.color()),
                             // NOTE: KHR_punctual_lights defines the intensity units for point lights in
                             // candela (lm/sr) which is luminous intensity and we need luminous power.
@@ -1598,7 +1645,12 @@ fn load_node <G:GltfTrait> (
                             range: light.range().unwrap_or(20.0),
                             radius: 0.0,
                             ..Default::default()
-                        });
+                        };
+                        let mut entity = parent.spawn_empty();
+                        G::edit_point_light(GltfTraitLight::new(
+                            load_context, &mut entity, &mut light_comp, gltf_node, &light
+                        ));
+                        let mut entity = parent.spawn(light_comp);
                         if let Some(name) = light.name() {
                             entity.insert(Name::new(name.to_string()));
                         }
@@ -1612,7 +1664,7 @@ fn load_node <G:GltfTrait> (
                         inner_cone_angle,
                         outer_cone_angle,
                     } => {
-                        let mut entity = parent.spawn(SpotLight {
+                        let mut light_comp = SpotLight {
                             color: Color::srgb_from_array(light.color()),
                             // NOTE: KHR_punctual_lights defines the intensity units for spot lights in
                             // candela (lm/sr) which is luminous intensity and we need luminous power.
@@ -1623,7 +1675,12 @@ fn load_node <G:GltfTrait> (
                             inner_angle: inner_cone_angle,
                             outer_angle: outer_cone_angle,
                             ..Default::default()
-                        });
+                        };
+                        let mut entity = parent.spawn_empty();
+                        G::edit_spot_light(GltfTraitLight::new(
+                            load_context, &mut entity, &mut light_comp, gltf_node, &light
+                        ));
+                        let mut entity = parent.spawn(light_comp);
                         if let Some(name) = light.name() {
                             entity.insert(Name::new(name.to_string()));
                         }

@@ -159,7 +159,8 @@ impl <G:GltfTrait> Plugin for GltfPlugin <G> {
             .init_asset::<GltfPrimitive<G>>()
             .init_asset::<GltfMesh<G>>()
             .init_asset::<GltfSkin<G>>()
-;//            .preregister_asset_loader::<GltfLoader>(&["gltf", "glb"]);
+            .preregister_asset_loader::<GltfLoader<G>>(G::EXTENSIONS);
+        G::on_app(app);
     }
 
     fn finish(&self, app: &mut App) {
@@ -167,10 +168,11 @@ impl <G:GltfTrait> Plugin for GltfPlugin <G> {
             Some(render_device) => CompressedImageFormats::from_features(render_device.features()),
             None => CompressedImageFormats::NONE,
         };
-//        app.register_asset_loader(GltfLoader {
-  //          supported_compressed_formats,
-    //        custom_vertex_attributes: self.custom_vertex_attributes.clone(),
-      //  });
+        app.register_asset_loader(GltfLoader::<G> {
+            supported_compressed_formats,
+            custom_vertex_attributes: self.custom_vertex_attributes.clone(),
+            phantom: PhantomData::default()
+        });
     }
 }
 
