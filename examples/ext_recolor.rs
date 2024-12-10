@@ -53,18 +53,16 @@ fn startup (
     mut light:ResMut<AmbientLight>
 ){
     light.brightness = 5_000.;
-    commands.spawn(Camera3dBundle{
-        transform: Transform::from_xyz(0.,0.,12.),
-        ..default()
-    });
-    commands.spawn(SceneBundle{
-        transform: Transform::from_xyz(-1.2,0.,0.),
-        scene: assets.load("red_box.glb#Scene0").into(),
-        ..default()
-    });
-    commands.spawn(SceneBundle{
-        transform: Transform::from_xyz(1.2,0.,0.),
-        scene: assets.load("red_box.myglb#Scene0").into(),
-        ..default()
-    });
+    commands.spawn((
+        Camera3d::default(),
+        Transform::from_xyz(0.,0.,12.),
+    ));
+    commands.spawn((
+        Transform::from_xyz(-1.2,0.,0.),
+        SceneRoot(assets.load("red_box.glb#Scene0")),
+    ));
+    commands.spawn((
+        Transform::from_xyz(1.2,0.,0.),
+        SceneRoot(assets.load("red_box.myglb#Scene0").into()),
+    ));
 }
