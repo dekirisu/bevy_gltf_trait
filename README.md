@@ -51,7 +51,7 @@ fn main(){
 ```
 ..and can be modified with the trait to either **replace** or **extend** (using different extensions) scene imports.
 ```rust 
-#[derive(Reflect,Default)]
+#[derive(Reflect,Clone,Default)]
 struct WhiteGltf;
 impl GltfTrait for WhiteGltf {
     const EXTENSIONS: &'static [&'static str] = &["myglb"];
@@ -72,8 +72,3 @@ fn main(){
     app.run();
 }
 ```
-
-## Bevy support table
-| bevy | bevy_gltf_trait |
-|------|-----------|
-| 0.14 | 0.1      |
