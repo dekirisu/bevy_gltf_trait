@@ -22,15 +22,14 @@
 //! # use bevy_gltf::prelude::*;
 //!
 //! fn spawn_gltf(mut commands: Commands, asset_server: Res<AssetServer>) {
-//!     commands.spawn(SceneBundle {
+//!     commands.spawn((
 //!         // This is equivalent to "models/FlightHelmet/FlightHelmet.gltf#Scene0"
 //!         // The `#Scene0` label here is very important because it tells bevy to load the first scene in the glTF file.
 //!         // If this isn't specified bevy doesn't know which part of the glTF file to load.
-//!         scene: asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/FlightHelmet/FlightHelmet.gltf")),
+//!         SceneRoot(asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/FlightHelmet/FlightHelmet.gltf"))),
 //!         // You can use the transform to give it a position
-//!         transform: Transform::from_xyz(2.0, 0.0, -5.0),
-//!         ..Default::default()
-//!     });
+//!         Transform::from_xyz(2.0, 0.0, -5.0),
+//!     ));
 //! }
 //! ```
 //! # Loading parts of a glTF asset
@@ -72,18 +71,14 @@
 //!     };
 //!     *loaded = true;
 //!
-//!     commands.spawn(SceneBundle {
-//!         // Gets the first scene in the file
-//!         scene: gltf.scenes[0].clone(),
-//!         ..Default::default()
-//!     });
+//!     // Spawns the first scene in the file
+//!     commands.spawn(SceneRoot(gltf.scenes[0].clone()));
 //!
-//!     commands.spawn(SceneBundle {
-//!         // Gets the scene named "Lenses_low"
-//!         scene: gltf.named_scenes["Lenses_low"].clone(),
-//!         transform: Transform::from_xyz(1.0, 2.0, 3.0),
-//!         ..Default::default()
-//!     });
+//!     // Spawns the scene named "Lenses_low"
+//!     commands.spawn((
+//!         SceneRoot(gltf.named_scenes["Lenses_low"].clone()),
+//!         Transform::from_xyz(1.0, 2.0, 3.0),
+//!     ));
 //! }
 //! ```
 //!
@@ -95,134 +90,43 @@
 //!
 //! You can use [`GltfAssetLabel`] to ensure you are using the correct label.
 
+extern crate alloc;
+
+use std::marker::PhantomData;
+
 #[cfg(feature = "bevy_animation")]
 use bevy_animation::AnimationClip;
-use bevy_transform::components::Transform;
+use bevy_transform::prelude::Transform;
 use bevy_utils::HashMap;
 
+mod ext;
+pub use ext::*;
 mod loader;
 mod vertex_attributes;
-use gltf::{khr_lights_punctual::Light, Node, Primitive};
 pub use loader::*;
 
 use bevy_app::prelude::*;
-use bevy_asset::{Asset, AssetApp, AssetPath, Handle, LoadContext};
-use bevy_ecs::{prelude::Component, reflect::ReflectComponent, world::EntityWorldMut};
-use bevy_pbr::{DirectionalLight, Material, PointLight, SpotLight, StandardMaterial};
-use bevy_reflect::{Reflect, TypePath};
+use bevy_asset::{Asset, AssetApp, AssetPath, Handle};
+use bevy_ecs::{prelude::Component, reflect::ReflectComponent};
+use bevy_image::CompressedImageFormats;
+use bevy_reflect::{std_traits::ReflectDefault, Reflect, TypePath};
 use bevy_render::{
-    mesh::{Mesh, MeshVertexAttribute},
+    mesh::{skinning::SkinnedMeshInverseBindposes, Mesh, MeshVertexAttribute},
     renderer::RenderDevice,
-    texture::CompressedImageFormats,
 };
 use bevy_scene::Scene;
-use std::{fmt::Debug, marker::PhantomData};
 
-/// The `bevy_gltf` prelude.
+/// The glTF prelude.
+///
+/// This includes the most common types in this crate, re-exported for your convenience.
 pub mod prelude {
     #[doc(hidden)]
     pub use crate::{Gltf, GltfAssetLabel, GltfExtras};
 }
 
-/* -------------------------------- The Trait ------------------------------- */
-
-    pub trait GltfTrait: Send+Sync+'static+TypePath {
-        /// The extensions used by the asset loader
-        const EXTENSIONS: &'static [&'static str] = &["gltf", "glb"];
-        /// Actual Material attached to Entities
-        type Material:Material;
-        /// convert materials
-        fn convert_material (convert:GltfTraitMaterial) -> Self::Material;
-        /// Edit the app
-        fn on_app (_app:&mut App){}
-        /// Edit the entity or [Transform] of any light
-        fn on_light_parent (_edit:GltfTraitParent){}
-        /// Edit the entity or component of a [DirectionalLight]
-        fn edit_directional_light (_edit:GltfTraitLight<DirectionalLight>){}
-        /// Edit the entity or component of a [PointLight]
-        fn edit_point_light (_edit:GltfTraitLight<PointLight>){}
-        /// Edit the entity or component of a [SpotLight]
-        fn edit_spot_light (_edit:GltfTraitLight<SpotLight>){}        
-        /// Edit the entity or [Transform] of a set of meshes 
-        fn on_mesh_parent (_edit:GltfTraitParent){}      
-        /// Edit the entity or [Transform] of a set of skinned meshes 
-        fn on_skinned_mesh_parent (_edit:GltfTraitParent){}
-        /// Edit the entity of a skinned mesh 
-        fn on_skinned_mesh (_edit:GltfTraitEntity){}
-        /// Edit the entity of a mesh
-        fn on_mesh (_edit:GltfTraitEntity){}
-        /// Edit meshes
-        fn edit_mesh (_edit:GltfTraitMesh){}        
-
-    }
-    pub struct GltfTraitDefault;
-    impl GltfTrait for () {
-        type Material = StandardMaterial;        
-        fn convert_material (convert:GltfTraitMaterial) -> Self::Material {
-            convert.material
-        }
-    }
-
-/* --------------------------------- Helpers -------------------------------- */
-    
-    /// Struct to simplify parameters of the [GltfTrait] light parent method
-    pub struct GltfTraitMaterial <'a,'b> {
-        pub context: &'b LoadContext<'a>,
-        pub material: StandardMaterial,
-        pub raw:&'b gltf::Material<'a>
-    }
-
-    /// Struct to simplify parameters of the [GltfTrait] light parent method
-    pub struct GltfTraitEntity <'a,'b> {
-        pub context: &'b LoadContext<'a>,
-        pub entity: &'b mut EntityWorldMut<'a>,
-        pub node:&'b Node<'a>
-    }
-
-    /// Struct to simplify parameters of the [GltfTrait] light parent method
-    pub struct GltfTraitMesh <'a,'b> {
-        pub context: &'b LoadContext<'a>,
-        pub mesh: &'b mut Mesh,
-        pub raw: &'b Primitive<'a>
-    }
-
-    /// Struct to simplify parameters of the [GltfTrait] light parent method
-    pub struct GltfTraitParent <'a,'b> {
-        pub context: &'b LoadContext<'a>,
-        pub entity: &'b mut EntityWorldMut<'a>,
-        pub transform: &'b mut Transform,
-        pub node:&'b Node<'a>
-    }
-
-    /// Struct to simplify parameters of [GltfTrait]s light methods
-    pub struct GltfTraitLight <'a,'b, L> {
-        pub context: &'b LoadContext<'a>,
-        pub entity: &'b mut EntityWorldMut<'a>,
-        pub component: &'b mut L,
-        pub node:&'b Node<'a>,
-        pub raw: &'b Light<'b>
-    }
-    impl <'a,'b,L> GltfTraitLight <'a,'b, L> {
-        pub fn new(
-            context: &'b LoadContext<'a>,
-            entity: &'b mut EntityWorldMut<'a>,
-            component: &'b mut L,
-            node:&'b Node<'a>,
-            raw: &'b Light<'a>
-        ) -> Self { Self {
-            context,
-            entity,
-            component,
-            node,
-            raw
-        }}
-    }
-
-/* ------------------------------- Traited OG ------------------------------- */
-
 /// Adds support for glTF file loading to the app.
 #[derive(Default)]
-pub struct GltfPlugin <G:GltfTrait=()> {
+pub struct GltfPlugin <G:GltfTrait> {
     custom_vertex_attributes: HashMap<Box<str>, MeshVertexAttribute>,
     phantom: PhantomData<G>
 }
@@ -249,12 +153,13 @@ impl <G:GltfTrait> Plugin for GltfPlugin <G> {
             .register_type::<GltfSceneExtras>()
             .register_type::<GltfMeshExtras>()
             .register_type::<GltfMaterialExtras>()
+            .register_type::<GltfMaterialName>()
             .init_asset::<Gltf<G>>()
             .init_asset::<GltfNode<G>>()
             .init_asset::<GltfPrimitive<G>>()
             .init_asset::<GltfMesh<G>>()
-            .preregister_asset_loader::<GltfLoader<G>>(G::EXTENSIONS);
-        G::on_app(app);
+            .init_asset::<GltfSkin<G>>()
+;//            .preregister_asset_loader::<GltfLoader>(&["gltf", "glb"]);
     }
 
     fn finish(&self, app: &mut App) {
@@ -262,11 +167,10 @@ impl <G:GltfTrait> Plugin for GltfPlugin <G> {
             Some(render_device) => CompressedImageFormats::from_features(render_device.features()),
             None => CompressedImageFormats::NONE,
         };
-        app.register_asset_loader(GltfLoader::<G> {
-            supported_compressed_formats,
-            custom_vertex_attributes: self.custom_vertex_attributes.clone(),
-            phantom: PhantomData::default()
-        });
+//        app.register_asset_loader(GltfLoader {
+  //          supported_compressed_formats,
+    //        custom_vertex_attributes: self.custom_vertex_attributes.clone(),
+      //  });
     }
 }
 
@@ -289,6 +193,10 @@ pub struct Gltf <G:GltfTrait> {
     pub nodes: Vec<Handle<GltfNode<G>>>,
     /// Named nodes loaded from the glTF file.
     pub named_nodes: HashMap<Box<str>, Handle<GltfNode<G>>>,
+    /// All skins loaded from the glTF file.
+    pub skins: Vec<Handle<GltfSkin<G>>>,
+    /// Named skins loaded from the glTF file.
+    pub named_skins: HashMap<Box<str>, Handle<GltfSkin<G>>>,
     /// Default scene to be displayed.
     pub default_scene: Option<Handle<Scene>>,
     /// All animations loaded from the glTF file.
@@ -302,7 +210,8 @@ pub struct Gltf <G:GltfTrait> {
 }
 
 /// A glTF node with all of its child nodes, its [`GltfMesh`],
-/// [`Transform`](bevy_transform::prelude::Transform) and an optional [`GltfExtras`].
+/// [`Transform`](bevy_transform::prelude::Transform), its optional [`GltfSkin`]
+/// and an optional [`GltfExtras`].
 ///
 /// See [the relevant glTF specification section](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-node).
 #[derive(Asset, Debug, Clone, TypePath)]
@@ -315,8 +224,13 @@ pub struct GltfNode <G:GltfTrait> {
     pub children: Vec<Handle<GltfNode<G>>>,
     /// Mesh of the node.
     pub mesh: Option<Handle<GltfMesh<G>>>,
+    /// Skin of the node.
+    pub skin: Option<Handle<GltfSkin<G>>>,
     /// Local transform.
-    pub transform: bevy_transform::prelude::Transform,
+    pub transform: Transform,
+    /// Is this node used as an animation root
+    #[cfg(feature = "bevy_animation")]
+    pub is_animation_root: bool,
     /// Additional data.
     pub extras: Option<GltfExtras>,
 }
@@ -327,7 +241,8 @@ impl <G:GltfTrait> GltfNode <G> {
         node: &gltf::Node,
         children: Vec<Handle<GltfNode<G>>>,
         mesh: Option<Handle<GltfMesh<G>>>,
-        transform: bevy_transform::prelude::Transform,
+        transform: Transform,
+        skin: Option<Handle<GltfSkin<G>>>,
         extras: Option<GltfExtras>,
     ) -> Self {
         Self {
@@ -340,13 +255,70 @@ impl <G:GltfTrait> GltfNode <G> {
             children,
             mesh,
             transform,
+            skin,
+            #[cfg(feature = "bevy_animation")]
+            is_animation_root: false,
             extras,
+        }
+    }
+
+    /// Create a node with animation root mark
+    #[cfg(feature = "bevy_animation")]
+    pub fn with_animation_root(self, is_animation_root: bool) -> Self {
+        Self {
+            is_animation_root,
+            ..self
         }
     }
 
     /// Subasset label for this node within the gLTF parent asset.
     pub fn asset_label(&self) -> GltfAssetLabel {
         GltfAssetLabel::Node(self.index)
+    }
+}
+
+/// A glTF skin with all of its joint nodes, [`SkinnedMeshInversiveBindposes`](bevy_render::mesh::skinning::SkinnedMeshInverseBindposes)
+/// and an optional [`GltfExtras`].
+///
+/// See [the relevant glTF specification section](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-skin).
+#[derive(Asset, Debug, Clone, TypePath)]
+pub struct GltfSkin <G:GltfTrait> {
+    /// Index of the skin inside the scene
+    pub index: usize,
+    /// Computed name for a skin - either a user defined skin name from gLTF or a generated name from index
+    pub name: String,
+    /// All the nodes that form this skin.
+    pub joints: Vec<Handle<GltfNode<G>>>,
+    /// Inverse-bind matrices of this skin.
+    pub inverse_bind_matrices: Handle<SkinnedMeshInverseBindposes>,
+    /// Additional data.
+    pub extras: Option<GltfExtras>,
+}
+
+impl <G:GltfTrait> GltfSkin <G> {
+    /// Create a skin extracting name and index from glTF def
+    pub fn new(
+        skin: &gltf::Skin,
+        joints: Vec<Handle<GltfNode<G>>>,
+        inverse_bind_matrices: Handle<SkinnedMeshInverseBindposes>,
+        extras: Option<GltfExtras>,
+    ) -> Self {
+        Self {
+            index: skin.index(),
+            name: if let Some(name) = skin.name() {
+                name.to_string()
+            } else {
+                format!("GltfSkin{}", skin.index())
+            },
+            joints,
+            inverse_bind_matrices,
+            extras,
+        }
+    }
+
+    /// Subasset label for this skin within the gLTF parent asset.
+    pub fn asset_label(&self) -> GltfAssetLabel {
+        GltfAssetLabel::Skin(self.index)
     }
 }
 
@@ -391,7 +363,7 @@ impl <G:GltfTrait> GltfMesh <G> {
     }
 }
 
-/// Part of a [`GltfMesh`] that consists of a [`Mesh`], an optional [`StandardMaterial`] and [`GltfExtras`].
+/// Part of a [`GltfMesh`] that consists of a [`Mesh`], an optional [`G::Material`] and [`GltfExtras`].
 ///
 /// See [the relevant glTF specification section](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-mesh-primitive).
 #[derive(Asset, Debug, Clone, TypePath)]
@@ -422,7 +394,7 @@ impl <G:GltfTrait> GltfPrimitive <G> {
         extras: Option<GltfExtras>,
         material_extras: Option<GltfExtras>,
     ) -> Self {
-        GltfPrimitive {
+        Self {
             index: gltf_primitive.index(),
             parent_mesh_index: gltf_mesh.index(),
             name: {
@@ -453,7 +425,7 @@ impl <G:GltfTrait> GltfPrimitive <G> {
 ///
 /// See [the relevant glTF specification section](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-extras).
 #[derive(Clone, Debug, Reflect, Default, Component)]
-#[reflect(Component)]
+#[reflect(Component, Default, Debug)]
 pub struct GltfExtras {
     /// Content of the extra data.
     pub value: String,
@@ -463,7 +435,7 @@ pub struct GltfExtras {
 ///
 /// See [the relevant glTF specification section](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-extras).
 #[derive(Clone, Debug, Reflect, Default, Component)]
-#[reflect(Component)]
+#[reflect(Component, Default, Debug)]
 pub struct GltfSceneExtras {
     /// Content of the extra data.
     pub value: String,
@@ -473,7 +445,7 @@ pub struct GltfSceneExtras {
 ///
 /// See [the relevant glTF specification section](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-extras).
 #[derive(Clone, Debug, Reflect, Default, Component)]
-#[reflect(Component)]
+#[reflect(Component, Default, Debug)]
 pub struct GltfMeshExtras {
     /// Content of the extra data.
     pub value: String,
@@ -483,11 +455,18 @@ pub struct GltfMeshExtras {
 ///
 /// See [the relevant glTF specification section](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-extras).
 #[derive(Clone, Debug, Reflect, Default, Component)]
-#[reflect(Component)]
+#[reflect(Component, Default, Debug)]
 pub struct GltfMaterialExtras {
     /// Content of the extra data.
     pub value: String,
 }
+
+/// The material name of a glTF primitive.
+///
+/// See [the relevant glTF specification section](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-material).
+#[derive(Clone, Debug, Reflect, Default, Component)]
+#[reflect(Component)]
+pub struct GltfMaterialName(pub String);
 
 /// Labels that can be used to load part of a glTF
 ///
@@ -540,7 +519,7 @@ pub enum GltfAssetLabel {
     },
     /// `Texture{}`: glTF Texture as a Bevy `Image`
     Texture(usize),
-    /// `Material{}`: glTF Material as a Bevy `StandardMaterial`
+    /// `Material{}`: glTF Material as a Bevy `G::Material`
     Material {
         /// Index of this material
         index: usize,
@@ -551,12 +530,14 @@ pub enum GltfAssetLabel {
     DefaultMaterial,
     /// `Animation{}`: glTF Animation as Bevy `AnimationClip`
     Animation(usize),
-    /// `Skin{}`: glTF mesh skin as Bevy `SkinnedMeshInverseBindposes`
+    /// `Skin{}`: glTF mesh skin as `GltfSkin`
     Skin(usize),
+    /// `Skin{}/InverseBindMatrices`: glTF mesh skin matrices as Bevy `SkinnedMeshInverseBindposes`
+    InverseBindMatrices(usize),
 }
 
-impl std::fmt::Display for GltfAssetLabel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for GltfAssetLabel {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             GltfAssetLabel::Scene(index) => f.write_str(&format!("Scene{index}")),
             GltfAssetLabel::Node(index) => f.write_str(&format!("Node{index}")),
@@ -582,6 +563,9 @@ impl std::fmt::Display for GltfAssetLabel {
             GltfAssetLabel::DefaultMaterial => f.write_str("DefaultMaterial"),
             GltfAssetLabel::Animation(index) => f.write_str(&format!("Animation{index}")),
             GltfAssetLabel::Skin(index) => f.write_str(&format!("Skin{index}")),
+            GltfAssetLabel::InverseBindMatrices(index) => {
+                f.write_str(&format!("Skin{index}/InverseBindMatrices"))
+            }
         }
     }
 }

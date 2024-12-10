@@ -30,6 +30,12 @@ This is a fork of [bevy](https://github.com/bevyengine/bevy) `/crates/bevy_gltf`
     - Make sure to use `on_app` to `.register_type()` them
 - the provided gltf structs make it possible to react to custom gltf properties
 
+# Versions
+| Bevy | This |
+| ---- | ---- |
+| 0.15 | 0.2  |
+| 0.14 | 0.1  |
+
 # Example
 The original way of adding the plugin changes to:
 ```rust

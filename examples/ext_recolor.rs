@@ -8,7 +8,7 @@ use bevy_utils::HashMap;
 #[reflect(Component)]
 struct IsWhite;
 
-#[derive(Reflect,Default)]
+#[derive(Reflect,Clone,Default)]
 struct WhiteGltf;
 impl GltfTrait for WhiteGltf {
     const EXTENSIONS: &'static [&'static str] = &["myglb"];
@@ -59,12 +59,12 @@ fn startup (
     });
     commands.spawn(SceneBundle{
         transform: Transform::from_xyz(-1.2,0.,0.),
-        scene: assets.load("red_box.glb#Scene0"),
+        scene: assets.load("red_box.glb#Scene0").into(),
         ..default()
     });
     commands.spawn(SceneBundle{
         transform: Transform::from_xyz(1.2,0.,0.),
-        scene: assets.load("red_box.myglb#Scene0"),
+        scene: assets.load("red_box.myglb#Scene0").into(),
         ..default()
     });
 }
