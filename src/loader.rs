@@ -1650,7 +1650,7 @@ fn load_node <G:GltfTrait> (
                         G::edit_point_light(GltfTraitLight::new(
                             load_context, &mut entity, &mut light_comp, gltf_node, &light
                         ));
-                        let mut entity = parent.spawn(light_comp);
+                        entity.insert(light_comp);
                         if let Some(name) = light.name() {
                             entity.insert(Name::new(name.to_string()));
                         }
@@ -1680,7 +1680,7 @@ fn load_node <G:GltfTrait> (
                         G::edit_spot_light(GltfTraitLight::new(
                             load_context, &mut entity, &mut light_comp, gltf_node, &light
                         ));
-                        let mut entity = parent.spawn(light_comp);
+                        entity.insert(light_comp);
                         if let Some(name) = light.name() {
                             entity.insert(Name::new(name.to_string()));
                         }
