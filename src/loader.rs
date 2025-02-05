@@ -1597,6 +1597,8 @@ fn load_node <G:GltfTrait> (
                             context: load_context,
                             entity: &mut mesh_entity,
                             node: gltf_node,
+                            mesh: &mesh,
+                            primitive: &primitive
                         });
                         entity_to_skin_index_map.insert(mesh_entity.id(), skin.index());
                     } else {                        
@@ -1604,6 +1606,8 @@ fn load_node <G:GltfTrait> (
                             context: load_context,
                             entity: &mut mesh_entity,
                             node: gltf_node,
+                            mesh: &mesh,
+                            primitive: &primitive
                         });
                     }
                 }

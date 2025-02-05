@@ -56,7 +56,9 @@ pub trait GltfTrait: Send+Sync+'static+TypePath+Clone {
     pub struct GltfTraitEntity <'a,'b> {
         pub context: &'b LoadContext<'a>,
         pub entity: &'b mut EntityWorldMut<'a>,
-        pub node:&'b Node<'a>
+        pub node: &'b Node<'a>,
+        pub mesh: &'b gltf::Mesh<'a>,
+        pub primitive: &'b Primitive<'a>
     }
 
     /// Struct to simplify parameters of the [GltfTrait] light parent method
