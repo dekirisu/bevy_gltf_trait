@@ -1,4 +1,6 @@
 use bevy_ecs::world::EntityWorldMut;
+use bevy_mesh::Mesh;
+use bevy_reflect::TypePath;
 use bevy_transform::components::Transform;
 use bevy_asset::LoadContext;
 use bevy_pbr::{DirectionalLight, Material, PointLight, SpotLight, StandardMaterial};
