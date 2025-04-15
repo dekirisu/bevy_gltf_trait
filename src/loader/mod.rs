@@ -628,30 +628,30 @@ async fn load_gltf<'a, 'b, 'c, G:GltfTrait>(
                 });
             };
 
-            //{
-            //    let morph_target_reader = reader.read_morph_targets();
-            //    if morph_target_reader.len() != 0 {
-            //        let morph_targets_label = GltfAssetLabel::MorphTarget {
-            //            mesh: gltf_mesh.index(),
-            //            primitive: primitive.index(),
-            //        };
-            //        let morph_target_image = MorphTargetImage::new(
-            //            morph_target_reader.map(PrimitiveMorphAttributesIter),
-            //            mesh.count_vertices(),
-            //            RenderAssetUsages::default(),
-            //        )?;
-            //        let handle = load_context
-            //            .add_labeled_asset(morph_targets_label.to_string(), morph_target_image.0);
+            {
+                let morph_target_reader = reader.read_morph_targets();
+                if morph_target_reader.len() != 0 {
+                    let morph_targets_label = GltfAssetLabel::MorphTarget {
+                        mesh: gltf_mesh.index(),
+                        primitive: primitive.index(),
+                    };
+                    let morph_target_image = MorphTargetImage::new(
+                        morph_target_reader.map(PrimitiveMorphAttributesIter),
+                        mesh.count_vertices(),
+                        RenderAssetUsages::default(),
+                    )?;
+                    let handle = load_context
+                        .add_labeled_asset(morph_targets_label.to_string(), morph_target_image.0);
 
-            //        mesh.set_morph_targets(handle);
-            //        let extras = gltf_mesh.extras().as_ref();
-            //        if let Some(names) = extras.and_then(|extras| {
-            //            serde_json::from_str::<MorphTargetNames>(extras.get()).ok()
-            //        }) {
-            //            mesh.set_morph_target_names(names.target_names);
-            //        }
-            //    }
-            //}
+                    mesh.set_morph_targets(handle);
+                    let extras = gltf_mesh.extras().as_ref();
+                    if let Some(names) = extras.and_then(|extras| {
+                        serde_json::from_str::<MorphTargetNames>(extras.get()).ok()
+                    }) {
+                        mesh.set_morph_target_names(names.target_names);
+                    }
+                }
+            }
 
             if mesh.attribute(Mesh::ATTRIBUTE_NORMAL).is_none()
                 && matches!(mesh.primitive_topology(), PrimitiveTopology::TriangleList)
@@ -1443,25 +1443,25 @@ fn load_node <G:GltfTrait> (
                         ),
                     ));
 
-                    //let target_count = primitive.morph_targets().len();
-                    //if target_count != 0 {
-                    //    let weights = match mesh.weights() {
-                    //        Some(weights) => weights.to_vec(),
-                    //        None => vec![0.0; target_count],
-                    //    };
+                    let target_count = primitive.morph_targets().len();
+                    if target_count != 0 {
+                        let weights = match mesh.weights() {
+                            Some(weights) => weights.to_vec(),
+                            None => vec![0.0; target_count],
+                        };
 
-                    //    if morph_weights.is_none() {
-                    //        morph_weights = Some(weights.clone());
-                    //    }
+                        if morph_weights.is_none() {
+                            morph_weights = Some(weights.clone());
+                        }
 
-                    //    // unwrap: the parent's call to `MeshMorphWeights::new`
-                    //    // means this code doesn't run if it returns an `Err`.
-                    //    // According to https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#morph-targets
-                    //    // they should all have the same length.
-                    //    // > All morph target accessors MUST have the same count as
-                    //    // > the accessors of the original primitive.
-                    //    mesh_entity.insert(MeshMorphWeights::new(weights).unwrap());
-                    //}
+                        // unwrap: the parent's call to `MeshMorphWeights::new`
+                        // means this code doesn't run if it returns an `Err`.
+                        // According to https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#morph-targets
+                        // they should all have the same length.
+                        // > All morph target accessors MUST have the same count as
+                        // > the accessors of the original primitive.
+                        mesh_entity.insert(MeshMorphWeights::new(weights).unwrap());
+                    }
                     mesh_entity.insert(Aabb::from_min_max(
                         Vec3::from_slice(&bounds.min),
                         Vec3::from_slice(&bounds.max),
