@@ -12,7 +12,7 @@ use bevy_asset::{
     RenderAssetUsages,
 };
 use bevy_color::{Color, LinearRgba};
-use bevy_core_pipeline::prelude::Camera3d;
+use bevy_core_pipeline::{motion_blur::node, prelude::Camera3d};
 use bevy_ecs::{
     entity::{Entity, EntityHashMap},
     hierarchy::ChildSpawner,
@@ -34,7 +34,7 @@ use bevy_pbr::UvChannel;
 use bevy_pbr::{
     DirectionalLight, MeshMaterial3d, PointLight, SpotLight, StandardMaterial, MAX_JOINTS,
 };
-use bevy_platform_support::collections::{HashMap, HashSet};
+use bevy_platform::collections::{HashMap, HashSet};
 use bevy_render::{
     camera::{Camera, OrthographicProjection, PerspectiveProjection, Projection, ScalingMode},
     mesh::Mesh3d,
@@ -614,7 +614,7 @@ async fn load_gltf<'a, 'b, 'c, G:GltfTrait>(
                     &loader.custom_vertex_attributes,
                 ) {
                     Ok((attribute, values)) => mesh.insert_attribute(attribute, values),
-                    Err(err) => warn!("{}", err),
+                    Err(err) => println!("{}", err),
                 }
             }
 
@@ -628,7 +628,7 @@ async fn load_gltf<'a, 'b, 'c, G:GltfTrait>(
                 });
             };
 
-            {
+            if G::ENABLE_MORPHS{
                 let morph_target_reader = reader.read_morph_targets();
                 if morph_target_reader.len() != 0 {
                     let morph_targets_label = GltfAssetLabel::MorphTarget {
@@ -1443,25 +1443,28 @@ fn load_node <G:GltfTrait> (
                         ),
                     ));
 
-                    let target_count = primitive.morph_targets().len();
-                    if target_count != 0 {
-                        let weights = match mesh.weights() {
-                            Some(weights) => weights.to_vec(),
-                            None => vec![0.0; target_count],
-                        };
+                    if G::ENABLE_MORPHS {
+                        let target_count = primitive.morph_targets().len();
+                        if target_count != 0 {
+                            let weights = match mesh.weights() {
+                                Some(weights) => weights.to_vec(),
+                                None => vec![0.0; target_count],
+                            };
 
-                        if morph_weights.is_none() {
-                            morph_weights = Some(weights.clone());
+                            if morph_weights.is_none() {
+                                morph_weights = Some(weights.clone());
+                            }
+
+                            // unwrap: the parent's call to `MeshMorphWeights::new`
+                            // means this code doesn't run if it returns an `Err`.
+                            // According to https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#morph-targets
+                            // they should all have the same length.
+                            // > All morph target accessors MUST have the same count as
+                            // > the accessors of the original primitive.
+                            mesh_entity.insert(MeshMorphWeights::new(weights).unwrap());
                         }
-
-                        // unwrap: the parent's call to `MeshMorphWeights::new`
-                        // means this code doesn't run if it returns an `Err`.
-                        // According to https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#morph-targets
-                        // they should all have the same length.
-                        // > All morph target accessors MUST have the same count as
-                        // > the accessors of the original primitive.
-                        mesh_entity.insert(MeshMorphWeights::new(weights).unwrap());
                     }
+
                     mesh_entity.insert(Aabb::from_min_max(
                         Vec3::from_slice(&bounds.min),
                         Vec3::from_slice(&bounds.max),
@@ -1628,18 +1631,18 @@ fn load_node <G:GltfTrait> (
         }
     });
 
-    // Only include meshes in the output if they're set to be retained in the MAIN_WORLD and/or RENDER_WORLD by the load_meshes flag
-    if !settings.load_meshes.is_empty() {
-        if let (Some(mesh), Some(weights)) = (gltf_node.mesh(), morph_weights) {
-            let primitive_label = mesh.primitives().next().map(|p| GltfAssetLabel::Primitive {
-                mesh: mesh.index(),
-                primitive: p.index(),
-            });
-            let first_mesh =
-                primitive_label.map(|label| load_context.get_label_handle(label.to_string()));
-            node.insert(MorphWeights::new(weights, first_mesh)?);
-        }
-    }
+//    // Only include meshes in the output if they're set to be retained in the MAIN_WORLD and/or RENDER_WORLD by the load_meshes flag
+//    if !settings.load_meshes.is_empty() {
+//        if let (Some(mesh), Some(weights)) = (gltf_node.mesh(), morph_weights) {
+//            let primitive_label = mesh.primitives().next().map(|p| GltfAssetLabel::Primitive {
+//                mesh: mesh.index(),
+//                primitive: p.index(),
+//            });
+//            let first_mesh =
+//                primitive_label.map(|label| load_context.get_label_handle(label.to_string()));
+//            node.insert(MorphWeights::new(weights, first_mesh)?);
+//        }
+//    }
 
     if let Some(err) = gltf_error {
         Err(err)

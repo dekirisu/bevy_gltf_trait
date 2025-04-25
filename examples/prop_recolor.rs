@@ -1,8 +1,7 @@
 // recolors materials with the custom property 'is_green' to green
 
-use bevy::prelude::*;
+use bevy::{platform::collections::HashMap, prelude::*};
 use bevy_gltf_trait::*;
-use bevy_utils::HashMap;
 
 #[derive(Reflect,Clone,Default)]
 struct WhiteGltf;

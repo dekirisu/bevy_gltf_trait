@@ -1,8 +1,7 @@
 // recolors materials with the extension 'myglb' to white
 
-use bevy::prelude::*;
+use bevy::{platform::collections::HashMap, prelude::*};
 use bevy_gltf_trait::*;
-use bevy_utils::HashMap;
 
 #[derive(Reflect,Component)]
 #[reflect(Component)]

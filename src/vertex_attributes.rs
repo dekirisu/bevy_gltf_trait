@@ -1,5 +1,5 @@
 use bevy_mesh::{Mesh, MeshVertexAttribute, VertexAttributeValues as Values, VertexFormat};
-use bevy_platform_support::collections::HashMap;
+use bevy_platform::collections::HashMap;
 use gltf::{
     accessor::{DataType, Dimensions},
     mesh::util::{ReadColors, ReadJoints, ReadTexCoords, ReadWeights},
@@ -266,9 +266,11 @@ pub(crate) fn convert_attribute(
         gltf::Semantic::Weights(0) => {
             Some((Mesh::ATTRIBUTE_JOINT_WEIGHT, ConversionMode::JointWeight))
         }
-        gltf::Semantic::Extras(name) => custom_vertex_attributes
+        gltf::Semantic::Extras(name) => {
+            println!{"{:?}",custom_vertex_attributes}
+            custom_vertex_attributes
             .get(name.as_str())
-            .map(|attr| (*attr, ConversionMode::Any)),
+            .map(|attr| (*attr, ConversionMode::Any))},
         _ => None,
     } {
         let raw_iter = VertexAttributeIter::from_accessor(accessor.clone(), buffer_data);
