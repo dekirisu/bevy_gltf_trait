@@ -1,9 +1,10 @@
 use bevy_ecs::world::EntityWorldMut;
+use bevy_light::{DirectionalLight, PointLight, SpotLight};
 use bevy_mesh::Mesh;
 use bevy_reflect::TypePath;
 use bevy_transform::components::Transform;
 use bevy_asset::LoadContext;
-use bevy_pbr::{DirectionalLight, Material, PointLight, SpotLight, StandardMaterial};
+use bevy_pbr::{Material, StandardMaterial};
 use gltf::{khr_lights_punctual::Light, Node, Primitive};
 
 use crate::*;
