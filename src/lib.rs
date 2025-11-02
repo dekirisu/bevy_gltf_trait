@@ -1,4 +1,4 @@
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]
 #![doc(
     html_logo_url = "https://bevy.org/assets/icon.png",
@@ -99,10 +99,7 @@ mod label;
 mod loader;
 mod vertex_attributes;
 
-extern crate alloc;
-
-use alloc::sync::Arc;
-use std::{marker::PhantomData, sync::Mutex};
+use std::{marker::PhantomData, sync::{Arc, Mutex}};
 use tracing::warn;
 
 use bevy_platform::collections::HashMap;

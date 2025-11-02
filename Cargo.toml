@@ -17,23 +17,23 @@ pbr_specular_textures = ["bevy_pbr/pbr_specular_textures"]
 
 [dependencies]
 # bevy
-bevy_animation = { version = "0.17.0-rc.1", optional = true }
-bevy_app = { version = "0.17.0-rc.1" }
-bevy_asset = { version = "0.17.0-rc.1" }
-bevy_color = { version = "0.17.0-rc.1" }
-bevy_ecs = { version = "0.17.0-rc.1" }
-bevy_image = { version = "0.17.0-rc.1" }
-bevy_light = { version = "0.17.0-rc.1" }
-bevy_camera = { version = "0.17.0-rc.1" }
-bevy_math = { version = "0.17.0-rc.1" }
-bevy_mesh = { version = "0.17.0-rc.1" }
-bevy_pbr = { version = "0.17.0-rc.1" }
-bevy_reflect = { version = "0.17.0-rc.1" }
-bevy_render = { version = "0.17.0-rc.1" }
-bevy_scene = { version = "0.17.0-rc.1" }
-bevy_transform = { version = "0.17.0-rc.1" }
-bevy_tasks = { version = "0.17.0-rc.1" }
-bevy_platform = { version = "0.17.0-rc.1", default-features = false, features = [
+bevy_animation = { version = "0.17", optional = true }
+bevy_app = { version = "0.17" }
+bevy_asset = { version = "0.17" }
+bevy_color = { version = "0.17" }
+bevy_ecs = { version = "0.17" }
+bevy_image = { version = "0.17" }
+bevy_light = { version = "0.17" }
+bevy_camera = { version = "0.17" }
+bevy_math = { version = "0.17" }
+bevy_mesh = { version = "0.17" }
+bevy_pbr = { version = "0.17" }
+bevy_reflect = { version = "0.17" }
+bevy_render = { version = "0.17" }
+bevy_scene = { version = "0.17" }
+bevy_transform = { version = "0.17" }
+bevy_tasks = { version = "0.17" }
+bevy_platform = { version = "0.17", default-features = false, features = [
   "std",
   "serialize",
 ] }
@@ -63,5 +63,5 @@ smallvec = { version = "1", default-features = false }
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 
 [dev-dependencies]
-bevy_log = { version = "0.17.0-rc.1" }
-bevy = "0.17.0-rc.1"
+bevy_log = { version = "0.17" }
+bevy = "0.17"
