@@ -89,17 +89,56 @@
 //! Be careful when using this feature, if you misspell a label it will simply ignore it without warning.
 //!
 //! You can use [`GltfAssetLabel`] to ensure you are using the correct label.
+//!
+//! # Supported KHR Extensions
+//!
+//! glTF files may use functionality beyond the base glTF specification, specified as a list of
+//! required extensions. The table below shows which of the ratified Khronos extensions are
+//! supported by Bevy.
+//!
+//! | Extension                         | Supported | Requires feature                    |
+//! | --------------------------------- | --------- | ----------------------------------- |
+//! | `KHR_animation_pointer`           | ❌        |                                     |
+//! | `KHR_draco_mesh_compression`      | ❌        |                                     |
+//! | `KHR_lights_punctual`             | ✅        |                                     |
+//! | `KHR_materials_anisotropy`        | ✅        | `pbr_anisotropy_texture`            |
+//! | `KHR_materials_clearcoat`         | ✅        | `pbr_multi_layer_material_textures` |
+//! | `KHR_materials_dispersion`        | ❌        |                                     |
+//! | `KHR_materials_emissive_strength` | ✅        |                                     |
+//! | `KHR_materials_ior`               | ✅        |                                     |
+//! | `KHR_materials_iridescence`       | ❌        |                                     |
+//! | `KHR_materials_sheen`             | ❌        |                                     |
+//! | `KHR_materials_specular`          | ✅        | `pbr_specular_textures`             |
+//! | `KHR_materials_transmission`      | ✅        | `pbr_transmission_textures`         |
+//! | `KHR_materials_unlit`             | ✅        |                                     |
+//! | `KHR_materials_variants`          | ❌        |                                     |
+//! | `KHR_materials_volume`            | ✅        |                                     |
+//! | `KHR_mesh_quantization`           | ❌        |                                     |
+//! | `KHR_texture_basisu`              | ❌\*      |                                     |
+//! | `KHR_texture_transform`           | ✅\**     |                                     |
+//! | `KHR_xmp_json_ld`                 | ❌        |                                     |
+//! | `EXT_mesh_gpu_instancing`         | ❌        |                                     |
+//! | `EXT_meshopt_compression`         | ❌        |                                     |
+//! | `EXT_texture_webp`                | ❌\*      |                                     |
+//!
+//! \*Bevy supports ktx2 and webp formats but doesn't support the extension's syntax, see [#19104](https://github.com/bevyengine/bevy/issues/19104).
+//!
+//! \**`KHR_texture_transform` is only supported on `base_color_texture`, see [#15310](https://github.com/bevyengine/bevy/issues/15310).
+//!
+//! See the [glTF Extension Registry](https://github.com/KhronosGroup/glTF/blob/main/extensions/README.md) for more information on extensions.
 
-mod ext; 
-pub use ext::*;
+mod ext;                                                                                              pub use ext::*; 
 
 mod assets;
-mod convert_coordinates;
+pub mod convert_coordinates;
 mod label;
 mod loader;
 mod vertex_attributes;
 
-use std::{marker::PhantomData, sync::{Arc, Mutex}};
+extern crate alloc;
+
+use alloc::sync::Arc;
+use std::{marker::PhantomData, sync::Mutex};
 use tracing::warn;
 
 use bevy_platform::collections::HashMap;
@@ -117,6 +156,8 @@ pub mod prelude {
     #[doc(hidden)]
     pub use crate::{assets::Gltf, assets::GltfExtras, label::GltfAssetLabel};
 }
+
+use crate::{convert_coordinates::GltfConvertCoordinates, extensions::GltfExtensionHandlers};
 
 pub use {assets::*, label::GltfAssetLabel, loader::*};
 
@@ -159,19 +200,9 @@ pub struct GltfPlugin <G:GltfTrait> {
     /// Can be modified with the [`DefaultGltfImageSampler`] resource.
     pub default_sampler: ImageSamplerDescriptor,
 
-    /// _CAUTION: This is an experimental feature with [known issues](https://github.com/bevyengine/bevy/issues/20621). Behavior may change in future versions._
-    ///
-    /// How to convert glTF coordinates on import. Assuming glTF cameras, glTF lights, and glTF meshes had global identity transforms,
-    /// their Bevy [`Transform::forward`](bevy_transform::components::Transform::forward) will be pointing in the following global directions:
-    /// - When set to `false`
-    ///   - glTF cameras and glTF lights: global -Z,
-    ///   - glTF models: global +Z.
-    /// - When set to `true`
-    ///   - glTF cameras and glTF lights: global +Z,
-    ///   - glTF models: global -Z.
-    ///
-    /// The default is `false`.
-    pub use_model_forward_direction: bool,
+    /// The default glTF coordinate conversion setting. This can be overridden
+    /// per-load by [`GltfLoaderSettings::convert_coordinates`].
+    pub convert_coordinates: GltfConvertCoordinates,
 
     /// Registry for custom vertex attributes.
     ///
@@ -186,7 +217,7 @@ impl <G:GltfTrait> Default for GltfPlugin<G> {
         GltfPlugin {
             default_sampler: ImageSamplerDescriptor::linear(),
             custom_vertex_attributes: HashMap::default(),
-            use_model_forward_direction: false,
+            convert_coordinates: GltfConvertCoordinates::default(),
             phantom: PhantomData::default()
         }
     }
@@ -208,14 +239,15 @@ impl <G:GltfTrait> GltfPlugin<G> {
     }
 }
 
-impl<G:GltfTrait> Plugin for GltfPlugin<G> {
+impl <G:GltfTrait> Plugin for GltfPlugin<G> {
     fn build(&self, app: &mut App) {
         app.init_asset::<Gltf<G>>()
             .init_asset::<GltfNode<G>>()
             .init_asset::<GltfPrimitive<G>>()
             .init_asset::<GltfMesh<G>>()
             .init_asset::<GltfSkin<G>>()
-            .preregister_asset_loader::<GltfLoader<G>>(G::EXTENSIONS);
+            .preregister_asset_loader::<GltfLoader<G>>(G::EXTENSIONS)
+            .init_resource::<GltfExtensionHandlers<G>>();
         G::on_app(app);
     }
 
@@ -234,11 +266,14 @@ impl<G:GltfTrait> Plugin for GltfPlugin<G> {
         let default_sampler = default_sampler_resource.get_internal();
         app.insert_resource(default_sampler_resource);
 
+        let extensions = app.world().resource::<GltfExtensionHandlers<G>>();
+
         app.register_asset_loader(GltfLoader::<G> {
             supported_compressed_formats,
             custom_vertex_attributes: self.custom_vertex_attributes.clone(),
             default_sampler,
-            default_use_model_forward_direction: self.use_model_forward_direction,
+            default_convert_coordinates: self.convert_coordinates,
+            extensions: extensions.0.clone(),
             phantom: PhantomData::default()
         });
     }

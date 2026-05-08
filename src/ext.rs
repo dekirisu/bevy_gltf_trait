@@ -9,7 +9,7 @@ use gltf::{khr_lights_punctual::Light, Node, Primitive};
 
 use crate::*;
 
-pub trait GltfTrait: Send+Sync+'static+TypePath+Clone {
+pub trait GltfTrait: Send+Sync+'static+TypePath+Clone+Default {
         /// The extensions used by the asset loader
         const EXTENSIONS: &'static [&'static str] = &["gltf", "glb"];
         const ENABLE_MORPHS: bool = true;
@@ -51,8 +51,6 @@ pub trait GltfTrait: Send+Sync+'static+TypePath+Clone {
     
     /// Struct to simplify parameters of the [GltfTrait] light parent method
     pub struct GltfTraitMaterial <'a,'b> {
-//        pub node: &'b Node<'a>,
-        pub context: &'b LoadContext<'a>,
         pub material: StandardMaterial,
         pub raw:&'b gltf::Material<'a>
     }

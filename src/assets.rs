@@ -11,7 +11,7 @@ use bevy_platform::collections::HashMap;
 use bevy_reflect::{prelude::ReflectDefault, Reflect, TypePath};
 use bevy_scene::Scene;
 
-use crate::{ext::*, GltfAssetLabel};
+use crate::{GltfAssetLabel, GltfTrait};
 
 /// Representation of a loaded glTF file.
 #[derive(Asset, Debug, TypePath)]
@@ -157,7 +157,7 @@ impl <G:GltfTrait> GltfNode<G> {
     }
 }
 
-/// Part of a [`GltfMesh`] that consists of a [`Mesh`], an optional [`G::Material`] and [`GltfExtras`].
+/// Part of a [`GltfMesh`] that consists of a [`Mesh`], an optional [`StandardMaterial`] and [`GltfExtras`].
 ///
 /// See [the relevant glTF specification section](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-mesh-primitive).
 #[derive(Asset, Debug, Clone, TypePath)]

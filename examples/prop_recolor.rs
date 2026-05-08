@@ -33,7 +33,7 @@ fn main(){
 fn startup (
     mut commands: Commands,
     assets:Res<AssetServer>,
-    mut light:ResMut<AmbientLight>
+    mut light:ResMut<GlobalAmbientLight>
 ){
     light.brightness = 5_000.;
     commands.spawn((
