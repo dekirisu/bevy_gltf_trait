@@ -3,7 +3,7 @@ use bevy_light::{DirectionalLight, PointLight, SpotLight};
 use bevy_mesh::Mesh;
 use bevy_reflect::TypePath;
 use bevy_transform::components::Transform;
-use bevy_asset::LoadContext;
+use bevy_asset::{AssetPath, LoadContext};
 use bevy_pbr::{Material, StandardMaterial};
 use gltf::{khr_lights_punctual::Light, Node, Primitive};
 
@@ -51,6 +51,7 @@ pub trait GltfTrait: Send+Sync+'static+TypePath+Clone+Default {
     
     /// Struct to simplify parameters of the [GltfTrait] light parent method
     pub struct GltfTraitMaterial <'a,'b> {
+        pub asset_path: &'b AssetPath<'a>,
         pub material: StandardMaterial,
         pub raw:&'b gltf::Material<'a>
     }

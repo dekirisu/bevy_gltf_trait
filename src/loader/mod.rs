@@ -1434,6 +1434,7 @@ fn load_material<G:GltfTrait>(
     };
 
     let standard_material = G::convert_material(GltfTraitMaterial {  
+        asset_path: &asset_path,
         material: standard_material,  
         raw: material  
     });
