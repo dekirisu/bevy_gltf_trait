@@ -8,7 +8,10 @@
     </a>
 </p>
 
-This is a fork of [bevy](https://github.com/bevyengine/bevy) `/crates/bevy_gltf`, that doesn't change any functionalities, but provides several possibilities to `customize` the conversion between gltf and bevy interns `on load` using the trait `GltfTrait`. 
+This is a fork of [bevy](https://github.com/bevyengine/bevy) `/crates/bevy_gltf`, that doesn't change any features, but enables modifications `on load` through a simple trait. e.g.:
+- make the gltf-loader use a custom material on entities
+- make it insert components based on custom gltf properties
+- or more general: modify how to `gltf -> bevy`
 
 # Usage
 
@@ -23,7 +26,7 @@ fn main(){
     app.run();
 }
 
-// Define your modified Gltf-Loader
+
 #[derive(Reflect,Clone,Default)]
 struct BlueGltf;
 
@@ -37,14 +40,25 @@ impl GltfTrait for BlueGltf {
     // App access
     fn on_app (_app:&mut App){}
 
+    // How to attach a material to an Entity
+    fn attach_material(edit:GltfTraitMaterialAttach<Self::Material>) {
+        edit.entity.insert(MeshMaterial3d(edit.handle));
+    }
+
     // What Material should the Entities use?
     type Material = StandardMaterial;        
     // How to translate from gltf::Material and bevy::StandardMaterial to your choice?
     // e.g.: all base-colors shall be blue!
-    fn convert_material (mut convert:GltfTraitMaterial) -> Self::Material {
-        convert.material.base_color = Color::srgb(0.,0.,1.);
-        convert.material.base_color_texture = None;
-        convert.material
+    fn convert_material (convert:GltfTraitMaterial) -> Self::Material {
+        let gltf = convert.material;
+        StandardMaterial{
+            base_color: Color::srgb(0.,0.,1.),
+            base_color_texture: gltf.base_color_texture,
+            perceptual_roughness: gltf.perceptual_roughness,
+            metallic: gltf.metallic,
+            emissive: gltf.emissive,
+            ..default()
+        }
     }
 
     // Edit the entity of a mesh
@@ -72,31 +86,15 @@ impl GltfTrait for BlueGltf {
 }
 ```
 
-# Notes
-- If you want to insert components through the trait and they are foreign to bevy_gltf: 
-    - Make sure to use `on_app` to `.register_type()` them
-- the provided gltf structs make it possible to react to custom gltf properties
-
-# Original Loader
-The original way of adding the plugin changes to:
-```rust
-fn main(){
-    let mut app = App::new();
-    app.add_plugins((
-        MinimalPlugins,
-        GltfPlugin::<()>::default(),
-    ));
-    app.run();
-}
-```
-
 # Versions
 | Bevy | This |
 | ---- | ---- |
-| 0.18 | 0.6  |
-| 0.17 | 0.5  |
-| 0.16 | 0.4  |
-| 0.15 | 0.2  |
-| 0.14 | 0.1  |
+| 0.20 | 0 8 |
+| 0.19 | ❌ |
+| 0.18 | 0.6 |
+| 0.17 | 0.5 |
+| 0.16 | 0.4 |
+| 0.15 | 0.2 |
+| 0.14 | 0.1 |
 
 

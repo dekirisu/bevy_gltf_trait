@@ -2,21 +2,30 @@
 
 use bevy::{platform::collections::HashMap, prelude::*};
 use bevy_gltf_trait::*;
+use bevy_color::palettes::css as Colors;
 
 #[derive(Reflect,Clone,Default)]
-struct WhiteGltf;
-impl GltfTrait for WhiteGltf {
+struct WhiteOrGreenGltf;
+impl GltfTrait for WhiteOrGreenGltf {
     const EXTENSIONS: &'static [&'static str] = &["myglb"];
     type Material = StandardMaterial;        
-    fn convert_material (mut convert:GltfTraitMaterial) -> Self::Material {
+    fn attach_material(edit:GltfTraitMaterialAttach<Self::Material>) {
+        edit.entity.insert(MeshMaterial3d(edit.handle));
+    }
+    fn convert_material(mut convert:GltfTraitMaterial) -> Self::Material {
+        let mut is_green = false;
         convert.material.base_color_texture = None;
         if let Some(extras) =  convert.raw.extras() {
             let map: HashMap<String,serde_json::Value> = serde_json::from_str(extras.get()).unwrap();
-            if map.contains_key("is_green"){
-                convert.material.base_color = Color::linear_rgb(0.,1.,0.);
-            }
+            is_green |= map.contains_key("is_green");
         }
-        convert.material
+        StandardMaterial{
+            base_color: match is_green {
+                true => Colors::GREEN,
+                false => Colors::WHITE,
+            }.into(),
+            ..default()
+        }
     }
 }
 
@@ -24,13 +33,13 @@ fn main(){
     let mut app = App::new();
     app.add_plugins((
         DefaultPlugins,
-        GltfPlugin::<WhiteGltf>::default()
+        GltfPlugin::<WhiteOrGreenGltf>::default()
     ))
     .add_systems(Startup,startup);
     app.run();
 }
 
-fn startup (
+fn startup(
     mut commands: Commands,
     assets:Res<AssetServer>,
     mut light:ResMut<GlobalAmbientLight>
@@ -42,10 +51,10 @@ fn startup (
     ));
     commands.spawn((        
         Transform::from_xyz(-1.2,0.,0.),
-        SceneRoot(assets.load("red_box.glb#Scene0")),
+        WorldAssetRoot(assets.load("red_box.glb#Scene0")),
     ));
     commands.spawn((        
         Transform::from_xyz(1.2,0.,0.),
-        SceneRoot(assets.load("red_box.myglb#Scene0"))
+        WorldAssetRoot(assets.load("red_box.myglb#Scene0"))
     ));
 }

@@ -1,10 +1,11 @@
+use std::fmt::Debug;
+
 use bevy_ecs::world::EntityWorldMut;
 use bevy_light::{DirectionalLight, PointLight, SpotLight};
 use bevy_mesh::Mesh;
 use bevy_reflect::TypePath;
 use bevy_transform::components::Transform;
-use bevy_asset::{AssetPath, LoadContext};
-use bevy_pbr::{Material, StandardMaterial};
+use bevy_asset::{Asset, AssetPath, Handle, LoadContext};
 use gltf::{khr_lights_punctual::Light, Node, Primitive};
 
 use crate::*;
@@ -14,7 +15,9 @@ pub trait GltfTrait: Send+Sync+'static+TypePath+Clone+Default {
         const EXTENSIONS: &'static [&'static str] = &["gltf", "glb"];
         const ENABLE_MORPHS: bool = true;
         /// Actual Material attached to Entities
-        type Material:Material;
+        type Material:Asset+Clone+Debug;
+        // how the material is attached to an entity
+        fn attach_material(_edit:GltfTraitMaterialAttach<Self::Material>){}
         /// convert materials
         fn convert_material (convert:GltfTraitMaterial) -> Self::Material;
         /// Edit the app
@@ -37,22 +40,30 @@ pub trait GltfTrait: Send+Sync+'static+TypePath+Clone+Default {
         fn on_mesh (_edit:GltfTraitEntity){}
         /// Edit meshes
         fn edit_mesh (_edit:GltfTraitMesh){}        
-
     }
+
     pub struct GltfTraitDefault;
     impl GltfTrait for () {
-        type Material = StandardMaterial;        
+        type Material = GltfMaterial;        
         fn convert_material (convert:GltfTraitMaterial) -> Self::Material {
             convert.material
         }
     }
 
 /* --------------------------------- Helpers -------------------------------- */
-    
+
+    /// Struct to simplify parameters of [GltfTrait]s material attach  methods
+    pub struct GltfTraitMaterialAttach <'a,'b, L:Asset> {
+        pub context: &'b LoadContext<'a>,
+        pub entity: &'b mut EntityWorldMut<'a>,
+        pub node:&'b Node<'a>,
+        pub handle: Handle<L>
+    }
+
     /// Struct to simplify parameters of the [GltfTrait] light parent method
     pub struct GltfTraitMaterial <'a,'b> {
         pub asset_path: &'b AssetPath<'a>,
-        pub material: StandardMaterial,
+        pub material: GltfMaterial,
         pub raw:&'b gltf::Material<'a>
     }
 

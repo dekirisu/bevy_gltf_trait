@@ -1,6 +1,6 @@
 [package]
 name = "bevy_gltf_trait"
-version = "0.6.1"
+version = "0.8.0"
 edition = "2024"
 description = "Customizable Bevy Engine GLTF loading"
 repository = "https://github.com/dekirisu/bevy_gltf_trait"
@@ -8,34 +8,36 @@ license = "MIT OR Apache-2.0"
 keywords = ["bevy"]
 
 [features]
-pbr_transmission_textures = ["bevy_pbr/pbr_transmission_textures"]
-pbr_multi_layer_material_textures = [
-  "bevy_pbr/pbr_multi_layer_material_textures",
-]
-pbr_anisotropy_texture = ["bevy_pbr/pbr_anisotropy_texture"]
-pbr_specular_textures = ["bevy_pbr/pbr_specular_textures"]
+pbr_transmission_textures = []
+pbr_multi_layer_material_textures = []
+pbr_anisotropy_texture = []
+pbr_specular_textures = []
 
 [dependencies]
 # bevy
-bevy_animation = { version = "0.18.0", optional = true, features = [
+bevy_animation = { version = "0.20.0", optional = true, features = [
   "bevy_mesh",
 ] }
-bevy_app = { version = "0.18.0" }
-bevy_asset = { version = "0.18.0" }
-bevy_color = { version = "0.18.0" }
-bevy_ecs = { version = "0.18.0" }
-bevy_image = { version = "0.18.0" }
-bevy_light = { version = "0.18.0" }
-bevy_camera = { version = "0.18.0" }
-bevy_math = { version = "0.18.0" }
-bevy_mesh = { version = "0.18.0" }
-bevy_pbr = { version = "0.18.0" }
-bevy_reflect = { version = "0.18.0" }
-bevy_render = { version = "0.18.0" }
-bevy_scene = { version = "0.18.0" }
-bevy_transform = { version = "0.18.0" }
-bevy_tasks = { version = "0.18.0" }
-bevy_platform = { version = "0.18.0", default-features = false, features = [
+bevy_app = { version = "0.20.0" }
+bevy_asset = { version = "0.20.0" }
+bevy_color = {  version = "0.20.0" }
+bevy_curve = { version = "0.20.0" }
+bevy_ecs = { version = "0.20.0" }
+bevy_image = { version = "0.20.0" }
+bevy_light = { version = "0.20.0" }
+bevy_camera = { version = "0.20.0" }
+bevy_math = { version = "0.20.0" }
+bevy_mesh = { version = "0.20.0", features = [
+  "serialize",
+  "morph",
+  "bevy_mikktspace",
+] }
+bevy_reflect = { version = "0.20.0" }
+bevy_material = { version = "0.20.0" }
+bevy_world_serialization = { version = "0.20.0" }
+bevy_transform = { version = "0.20.0" }
+bevy_tasks = { version = "0.20.0" }
+bevy_platform = { version = "0.20.0", default-features = false, features = [
   "std",
   "serialize",
 ] }
@@ -45,6 +47,7 @@ gltf = { version = "1.4.0", default-features = false, features = [
   "KHR_lights_punctual",
   "KHR_materials_transmission",
   "KHR_materials_ior",
+  "KHR_materials_specular",
   "KHR_materials_volume",
   "KHR_materials_unlit",
   "KHR_materials_emissive_strength",
@@ -56,7 +59,7 @@ gltf = { version = "1.4.0", default-features = false, features = [
 ] }
 async-lock = { version = "3.0", default-features = false }
 thiserror = { version = "2", default-features = false }
-base64 = "0.22.0"
+base64 = { version = "0.23.0", default-features = false, features = ["std"] }
 fixedbitset = "0.5"
 itertools = "0.14"
 percent-encoding = "2.1"
@@ -64,7 +67,10 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.140"
 smallvec = { version = "1", default-features = false }
 tracing = { version = "0.1", default-features = false, features = ["std"] }
+wgpu-types = { version = "30", default-features = false }
 
 [dev-dependencies]
-bevy.version = "0.18.0"
-bevy_log = { version = "0.18.0" }
+bevy.version = "0.20.0"
+bevy_log = { version = "0.20.0" }
+
+
